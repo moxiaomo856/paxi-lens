@@ -219,21 +219,21 @@ async function refreshBalance() {
 }
 
 // ============================================================
-// 通用工具函数 — 已迁移到 shared.js（toBase64/fromBase64/escapeHtml/
-// paxiToUpaxi/parseFloatToRawUnits/copyToClipboard/showToast/showStatus/
-// fetchAPI/buildSignAndBroadcast/checkTxResult/simulateGas/pollTxStatus/mapError）
-// ============================================================
-
-// ============================================================
 // 工具 1: 批量转账
 // ============================================================
 function renderBatchTransfer() {
   return `
     <div class="card">
       <div class="card-title">📤 批量转账</div>
+      <!-- 💡 发送模式说明 -->
+      <div class="info-box" style="background:rgba(99,102,241,0.08);border-color:rgba(99,102,241,0.2);font-size:12px;margin-bottom:12px;padding:10px 14px;border-radius:8px;border:1px solid rgba(99,102,241,0.3);">
+        <strong>💡 每笔转账独立发送</strong><br>
+        每个接收地址将收到<strong>独立交易</strong>，确保接收方钱包显示完整的转入记录。<br>
+        <span style="color:var(--text-muted);font-size:11px;">（手续费单独发送，不影响转账记录显示）</span>
+      </div>
       <div class="tool-desc">
         支持 PAXI 原生代币、PRC-20 代币、NFT 的批量发送。支持 CSV 导入（不同金额）和均额模式（相同金额）。
-        一笔交易打包多条消息，省 Gas、省时间。
+        每笔转账独立发送，接收方可查看完整记录。
       </div>
 
       <!-- Token Type Tabs -->
@@ -484,9 +484,9 @@ function parseBatchTransfer() {
     return;
   }
 
-  // 限制最大数量
-  if (validRecipients.length > CONFIG.maxMessagesPerTx) {
-    showStatus('btStatus', `单笔交易最多 ${CONFIG.maxMessagesPerTx} 个接收地址，请分批发送`, 'warning');
+  // 限制最大数量（逐笔发送模式可以支持更多，但仍建议分批）
+  if (validRecipients.length > 200) {
+    showStatus('btStatus', `单次最多 200 个接收地址，请分批发送（当前 ${validRecipients.length}）`, 'warning');
     return;
   }
 
@@ -563,6 +563,9 @@ function clearBatchTransfer() {
   document.getElementById('btStatus').style.display = 'none';
 }
 
+// ============================================================
+// 批量转账执行（核心修复：逐笔独立发送）
+// ============================================================
 async function executeBatchTransfer() {
   if (!state.connected) {
     showStatus('btStatus', '请先连接钱包', 'warning');
@@ -573,73 +576,65 @@ async function executeBatchTransfer() {
     return;
   }
 
-  const tokenType = state.batchTokenType;
   const btn = document.getElementById('btSendBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> 构建交易中...';
+  const statusEl = document.getElementById('btStatus');
+  const total = state.batchRecipients.length;
+  
+  // 重置状态显示
+  statusEl.className = 'status-msg info';
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = `<div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 开始逐笔发送（共 ${total} 笔）...</div>`;
 
   try {
     const sender = state.wallet;
     const denom = CONFIG.denom;
+    const tokenType = state.batchTokenType;
 
-    // Build messages
-    const messages = [];
-
-    // 计算手续费（纯字符串运算避免精度丢失）
-    const NFT_TRANSFER_FEE_PER_TX = 0.5;
-    let feeAmount, feeMicro;
-    if (tokenType === 'nft') {
-      feeAmount = state.batchRecipients.length * NFT_TRANSFER_FEE_PER_TX;
-      feeMicro = paxiToUpaxi(feeAmount.toFixed(6));
-    } else {
-      // 使用字符串求和避免浮点累计误差
-      let totalMicro = BigInt(0);
-      for (const r of state.batchRecipients) {
-        totalMicro += BigInt(paxiToUpaxi(r.amount));
-      }
-      feeMicro = (totalMicro * BigInt(Math.round(CONFIG.feeRate * 100)) / BigInt(10000)).toString();
-      const feePaxiRaw = (BigInt(feeMicro) / BigInt(1000000)).toString() + '.' + (BigInt(feeMicro) % BigInt(1000000)).toString().padStart(6, '0').replace(/0+$/, '');
-      feeAmount = parseFloat(feePaxiRaw || '0');
-    }
-
-    // 对于 PRC-20，需要先查询代币精度
-    let prc20Decimals = 6; // 默认 6 位
-    if (tokenType === 'prc20') {
-      const contractAddr = document.getElementById('btPrc20Contract').value.trim();
-      if (!contractAddr) {
-        showStatus('btStatus', '请输入 PRC-20 合约地址', 'warning');
-        btn.disabled = false;
-        btn.innerHTML = '🚀 执行批量转账';
-        return;
-      }
-      // 查询代币精度
-      try {
-        const queryMsg = btoa(JSON.stringify({ token_info: {} }));
-        const queryRes = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/contract/${contractAddr}/smart/${queryMsg}`).then(r => r.json());
-        if (queryRes?.data?.decimals !== undefined) {
-          prc20Decimals = queryRes.data.decimals;
-        }
-      } catch (e) {
-        console.warn('无法查询 PRC-20 精度，默认使用 6 位小数');
-      }
-    }
-
-    // 对于 NFT，验证合约地址
-    if (tokenType === 'nft') {
-      const nftContract = document.getElementById('btNftContract').value.trim();
-      if (!nftContract) {
-        showStatus('btStatus', '请输入 NFT 合约地址', 'warning');
-        btn.disabled = false;
-        btn.innerHTML = '🚀 执行批量转账';
-        return;
-      }
-    }
-
-    // 1. 添加所有转账消息
+    // ========== 第一步：计算总手续费 ==========
+    let totalAmountMicro = BigInt(0);
     for (const r of state.batchRecipients) {
+      totalAmountMicro += BigInt(paxiToUpaxi(r.amount));
+    }
+    // 计算手续费 (1.5%)
+    const feeMicro = (totalAmountMicro * BigInt(Math.round(CONFIG.feeRate * 100)) / BigInt(10000)).toString();
+    const feePaxi = upaxiToPaxi(feeMicro);
+
+    // 如果是 NFT 模式，手续费按笔数固定收取
+    let fixedFeeMicro = '0';
+    if (tokenType === 'nft') {
+      const totalFee = state.batchRecipients.length * 0.5;
+      fixedFeeMicro = paxiToUpaxi(totalFee.toFixed(6));
+    }
+    const actualFeeMicro = tokenType === 'nft' ? fixedFeeMicro : feeMicro;
+    const actualFeePaxi = upaxiToPaxi(actualFeeMicro);
+
+    // ========== 第二步：逐笔发送转账 ==========
+    let successCount = 0;
+    let failedCount = 0;
+    const results = [];
+
+    for (let i = 0; i < state.batchRecipients.length; i++) {
+      const r = state.batchRecipients[i];
+      
+      // 更新进度
+      btn.innerHTML = `<span class="spinner"></span> 发送 ${i+1}/${total}...`;
+      statusEl.innerHTML = `
+        <div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 正在发送 ${i+1}/${total}</div>
+        <div style="font-size:13px;">
+          📤 ${r.address.slice(0, 12)}...${r.address.slice(-4)} → ${r.amount} PAXI
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
+          ✅ 已成功 ${successCount} 笔 | ❌ 失败 ${failedCount} 笔
+        </div>
+      `;
+
+      // 构建单笔转账消息（只有1条MsgSend，不含手续费）
+      const messages = [];
+      
+      let amountMicro;
       if (tokenType === 'native') {
-        // 使用字符串转换避免浮点精度丢失
-        const amountMicro = paxiToUpaxi(r.amount);
+        amountMicro = paxiToUpaxi(r.amount);
         const msg = PaxiCosmJS.MsgSend.fromPartial({
           fromAddress: sender.address,
           toAddress: r.address,
@@ -650,8 +645,20 @@ async function executeBatchTransfer() {
           value: PaxiCosmJS.MsgSend.encode(msg).finish(),
         }));
       } else if (tokenType === 'prc20') {
-        const contractAddr = document.getElementById('btPrc20Contract').value.trim();
-        // PRC-20 transfer 的 amount 必须是原始单位字符串（基于代币精度）
+        // PRC-20 转账逻辑
+        const contractAddr = document.getElementById('btPrc20Contract')?.value.trim();
+        if (!contractAddr) {
+          failedCount++;
+          results.push({ address: r.address, amount: r.amount, status: '❌ 失败', error: '缺少合约地址' });
+          continue;
+        }
+        let prc20Decimals = 6;
+        try {
+          const queryMsg = btoa(JSON.stringify({ token_info: {} }));
+          const queryRes = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/contract/${contractAddr}/smart/${queryMsg}`).then(r => r.json());
+          if (queryRes?.data?.decimals !== undefined) prc20Decimals = queryRes.data.decimals;
+        } catch (e) {}
+        
         const rawAmount = parseFloatToRawUnits(r.amount, prc20Decimals);
         const msgObj = { transfer: { recipient: r.address, amount: rawAmount } };
         const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
@@ -664,8 +671,13 @@ async function executeBatchTransfer() {
           value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish(),
         }));
       } else if (tokenType === 'nft') {
-        const nftContract = document.getElementById('btNftContract').value.trim();
-        // NFT 模式下 amount 是 token_id（字符串）
+        // NFT 转账逻辑
+        const nftContract = document.getElementById('btNftContract')?.value.trim();
+        if (!nftContract) {
+          failedCount++;
+          results.push({ address: r.address, amount: r.amount, status: '❌ 失败', error: '缺少NFT合约地址' });
+          continue;
+        }
         const msgObj = { transfer_nft: { recipient: r.address, token_id: String(r.amount) } };
         const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
           sender: sender.address,
@@ -677,48 +689,145 @@ async function executeBatchTransfer() {
           value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish(),
         }));
       }
+
+      // 发送这笔独立交易（只有1条MsgSend，没有手续费）
+      try {
+        const memo = `Paxi Transfer ${i+1}/${total}`;
+        const broadcastRes = await buildSignAndBroadcast(messages, memo, null, sender);
+        const txResult = checkTxResult(broadcastRes);
+
+        if (txResult.ok) {
+          successCount++;
+          results.push({ 
+            address: r.address, 
+            amount: r.amount,
+            status: '✅ 成功', 
+            txhash: txResult.txhash 
+          });
+          // 轮询确认
+          pollTxStatus(txResult.txhash);
+        } else {
+          failedCount++;
+          results.push({ 
+            address: r.address, 
+            amount: r.amount,
+            status: '❌ 失败', 
+            error: mapError(txResult.code, txResult.rawLog) 
+          });
+        }
+      } catch (e) {
+        failedCount++;
+        results.push({ 
+          address: r.address, 
+          amount: r.amount,
+          status: '❌ 失败', 
+          error: e.message 
+        });
+      }
+
+      // 短暂延迟，避免序列号冲突
+      await new Promise(resolve => setTimeout(resolve, 800));
     }
 
-    // 2. 添加手续费消息（PAXI/PRC-20: 1.5% 金额；NFT: 0.5 PAXI/笔；均以 PAXI 原生代币支付）
-    if (feeMicro !== '0') {
+    // ========== 第三步：单独发送手续费（独立交易） ==========
+    if (actualFeeMicro !== '0' && successCount > 0) {
+      btn.innerHTML = '<span class="spinner"></span> 发送手续费...';
+      statusEl.innerHTML = `
+        <div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 发送手续费...</div>
+        <div style="font-size:13px;">
+          💰 ${actualFeePaxi} PAXI → 平台手续费地址
+        </div>
+      `;
+
+      const feeMessages = [];
       const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
         fromAddress: sender.address,
         toAddress: CONFIG.feeCollector,
-        amount: [PaxiCosmJS.coins(feeMicro, denom)[0]],
+        amount: [PaxiCosmJS.coins(actualFeeMicro, denom)[0]],
       });
-      messages.push(PaxiCosmJS.Any.fromPartial({
+      feeMessages.push(PaxiCosmJS.Any.fromPartial({
         typeUrl: '/cosmos.bank.v1beta1.MsgSend',
         value: PaxiCosmJS.MsgSend.encode(feeMsg).finish(),
       }));
+
+      try {
+        const feeRes = await buildSignAndBroadcast(feeMessages, 'Paxi Toolbox Fee', null, sender);
+        const feeResult = checkTxResult(feeRes);
+        if (feeResult.ok) {
+          pollTxStatus(feeResult.txhash);
+        } else {
+          // 手续费失败，但转账已成功，只需提示用户
+          statusEl.innerHTML = `
+            <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--warning)">⚠️ 转账完成，但手续费发送失败</div>
+            <div style="font-size:13px;color:var(--danger);">
+              ${mapError(feeResult.code, feeResult.rawLog)}
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">
+              请手动转账 ${actualFeePaxi} PAXI 到 ${CONFIG.feeCollector}
+            </div>
+          `;
+          btn.disabled = false;
+          btn.innerHTML = '🚀 执行批量转账';
+          return;
+        }
+      } catch (e) {
+        statusEl.innerHTML = `
+          <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--warning)">⚠️ 转账完成，但手续费发送失败</div>
+          <div style="font-size:13px;color:var(--danger);">
+            ${e.message}
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">
+            请手动转账 ${actualFeePaxi} PAXI 到 ${CONFIG.feeCollector}
+          </div>
+        `;
+        btn.disabled = false;
+        btn.innerHTML = '🚀 执行批量转账';
+        return;
+      }
     }
 
-    // 使用共享交易函数构建签名广播（Gas 自动估算）
-    const feeNote = ` (含${CONFIG.feeRate}%手续费=${feeAmount.toFixed(4)}PAXI)`;
-    const memo = `Paxi Toolbox Batch Transfer${feeNote}`;
-    btn.innerHTML = '<span class="spinner"></span> 等待钱包签名...';
+    // ========== 显示最终结果 ==========
+    let resultHtml = `
+      <div style="font-weight:600;font-size:16px;margin-bottom:10px;color:${successCount > 0 ? 'var(--success)' : 'var(--danger)'}">
+        ${successCount > 0 ? '✅' : '❌'} 完成！成功 ${successCount} 笔，失败 ${failedCount} 笔
+      </div>
+      ${actualFeeMicro !== '0' && successCount > 0 ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">💰 手续费：${actualFeePaxi} PAXI（已单独发送）</div>` : ''}
+      <div style="font-size:12px;color:var(--success);margin-bottom:10px;background:rgba(34,197,94,0.1);padding:8px 12px;border-radius:6px;">
+        💡 每笔转账都是独立交易，接收方钱包现在能看到完整的转入记录！
+      </div>
+      <div style="max-height:300px;overflow-y:auto;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px;">
+    `;
 
-    const broadcastRes = await buildSignAndBroadcast(messages, memo, null, sender);
-    const txResult = checkTxResult(broadcastRes);
-
-    if (txResult.ok) {
-      const feeNoteText = tokenType === 'nft'
-        ? ` 手续费 ${feeAmount.toFixed(4)} PAXI (${state.batchRecipients.length}笔×0.5PAXI)`
-        : ` 手续费 ${feeAmount.toFixed(4)} PAXI (${CONFIG.feeRate}%)`;
-      showStatus('btStatus',
-        `✅ 转账成功！${state.batchRecipients.length} 笔交易已发送。${feeNoteText} TxHash: ${txResult.txhash.slice(0, 20)}...`,
-        'success');
-      // 轮询交易确认
-      pollTxStatus(txResult.txhash).then(conf => {
-        if (conf.confirmed) showToast(conf.success ? '交易已上链确认' : '⚠️ 交易上链但执行失败', conf.success ? 'success' : 'error');
-      });
-      clearBatchTransfer();
-      refreshBalance();
-    } else {
-      showStatus('btStatus', `❌ 交易失败：${mapError(txResult.code, txResult.rawLog)}`, 'error');
+    for (const r of results) {
+      const isSuccess = r.status.includes('成功');
+      resultHtml += `
+        <div style="display:flex;justify-content:space-between;padding:6px 8px;border-bottom:1px solid var(--border);${isSuccess ? '' : 'background:rgba(239,68,68,0.05);'}">
+          <span>
+            <code style="font-size:10px;">${r.address.slice(0, 12)}...${r.address.slice(-4)}</code>
+            <span style="margin:0 6px;">→</span>
+            <strong>${r.amount}</strong> PAXI
+          </span>
+          <span style="color:${isSuccess ? 'var(--success)' : 'var(--danger)'};font-size:11px;">
+            ${isSuccess ? `✅ ${r.txhash?.slice(0, 12)}...` : `❌ ${r.error?.slice(0, 30)}`}
+          </span>
+        </div>
+      `;
     }
+    resultHtml += `</div>`;
+
+    statusEl.className = 'status-msg success';
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = resultHtml;
+
+    showToast(`✅ 完成！成功 ${successCount} 笔`, 'success');
+    refreshBalance();
+    clearBatchTransfer();
+
   } catch (e) {
     console.error('Batch transfer error:', e);
-    showStatus('btStatus', '❌ 执行失败：' + mapError(undefined, e.message), 'error');
+    statusEl.className = 'status-msg error';
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `❌ 执行失败：${mapError(undefined, e.message)}`;
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🚀 执行批量转账';
