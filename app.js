@@ -2,25 +2,27 @@
  * Paxi 工具箱 - 主应用逻辑
  * Paxi Network 生态工具集
  * 纯前端 · 零服务器 · 完全去中心化
+ *
+ * 依赖: shared.js（公共函数）+ compat.js（SDK 兼容层）+ paxi-cosmjs.umd.js（SDK）
+ * toBase64/fromBase64/escapeHtml/paxiToUpaxi/parseFloatToRawUnits/buildSignAndBroadcast/
+ * simulateGas/pollTxStatus/mapError/copyToClipboard/showToast/showStatus 等函数均在 shared.js 中定义
  */
 
 // ============================================================
-// 全局配置
+// 配置（网络相关字段从 shared.js 的 SHARED_CONFIG 动态获取）
 // ============================================================
 const CONFIG = {
-  rpc: 'https://mainnet-rpc.paxinet.io',
-  lcd: 'https://mainnet-lcd.paxinet.io',
-  denom: 'upaxi',
-  denomDisplay: 'PAXI',
-  chainId: 'paxi-mainnet',
-  gasPrice: '0.05upaxi',
-  gasLimit: 600000,
-  // 单笔交易最大消息数（防止 gas 爆炸）
-  maxMessagesPerTx: 100,
-  // 手续费接收地址
-  feeCollector: 'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd',
-  // 批量转账手续费比例（百分比 1.5%）
-  feeRate: 1.5,
+  get rpc() { return getNetworkConfig().rpc; },
+  get lcd() { return getLCD(); },
+  get denom() { return getDenom(); },
+  get denomDisplay() { return SHARED_CONFIG.denomDisplay; },
+  get chainId() { return getChainId(); },
+  gasPrice: SHARED_CONFIG.gasPrice,
+  gasLimit: SHARED_CONFIG.gasLimit,
+  maxMessagesPerTx: SHARED_CONFIG.maxMessagesPerTx,
+  feeCollector: SHARED_CONFIG.feeCollector,
+  feeRate: SHARED_CONFIG.feeRate,
+  nftMarket: SHARED_CONFIG.nftMarket,
 };
 
 // ============================================================
@@ -35,6 +37,12 @@ const state = {
   batchRecipients: [],
   batchTokenType: 'native', // native | prc20 | nft
   batchMode: 'csv',   // csv | uniform
+  // NFT 市场
+  nftMarket: {
+    subTab: 'browse',     // browse | list | mine | import
+    currentBuy: null,    // 当前购买流程 { listing, step }
+    morePanel: false,    // 更多面板是否展开
+  },
 };
 
 // ============================================================
@@ -68,12 +76,13 @@ function checkWalletInjection() {
 // 导航
 // ============================================================
 function initNavigation() {
-  document.querySelectorAll('.nav-item').forEach(item => {
+  document.querySelectorAll('.tab-bar-item').forEach(item => {
     item.addEventListener('click', () => {
       const tool = item.dataset.tool;
-      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      document.querySelectorAll('.tab-bar-item').forEach(i => i.classList.remove('active'));
       item.classList.add('active');
       state.currentTool = tool;
+      state.nftMarket.moreSubTool = null;
       renderTool(tool);
     });
   });
@@ -87,11 +96,13 @@ function renderTool(tool) {
   switch (tool) {
     case 'batch-transfer': main.innerHTML = renderBatchTransfer(); break;
     case 'balance-check': main.innerHTML = renderBalanceCheck(); break;
+    case 'nft-market': main.innerHTML = renderNftMarket(); break;
     case 'tx-tracker': main.innerHTML = renderTxTracker(); break;
     case 'gas-calc': main.innerHTML = renderGasCalc(); break;
     case 'address-convert': main.innerHTML = renderAddressConvert(); break;
     case 'validator-compare': main.innerHTML = renderValidatorCompare(); break;
     case 'token-info': main.innerHTML = renderTokenInfo(); break;
+    case 'more': main.innerHTML = renderMorePanel(); break;
   }
   // 绑定工具内的事件
   bindToolEvents(tool);
@@ -104,6 +115,9 @@ function bindToolEvents(tool) {
       break;
     case 'balance-check':
       bindBalanceCheckEvents();
+      break;
+    case 'nft-market':
+      bindNftMarketEvents();
       break;
     case 'tx-tracker':
       bindTxTrackerEvents();
@@ -119,6 +133,9 @@ function bindToolEvents(tool) {
       break;
     case 'token-info':
       bindTokenInfoEvents();
+      break;
+    case 'more':
+      // 更多面板无需额外绑定
       break;
   }
 }
@@ -188,11 +205,8 @@ async function refreshBalance() {
     const data = await res.json();
     const paxiBalance = data.balances?.find(b => b.denom === CONFIG.denom);
     if (paxiBalance) {
-      // 使用字符串解析避免大数精度丢失
-      const amountStr = paxiBalance.amount;
-      const intPart = amountStr.length > 6 ? amountStr.slice(0, -6) : '0';
-      const decPart = amountStr.length > 6 ? amountStr.slice(-6) : amountStr.padStart(6, '0');
-      state.balance = parseFloat(intPart + '.' + decPart);
+      // 使用 upaxiToPaxi 字符串转换避免大数精度丢失
+      state.balance = parseFloat(upaxiToPaxi(paxiBalance.amount));
       document.getElementById('walletBalance').textContent =
         state.balance.toLocaleString(undefined, { maximumFractionDigits: 6 }) + ' ' + CONFIG.denomDisplay;
     } else {
@@ -205,91 +219,10 @@ async function refreshBalance() {
 }
 
 // ============================================================
-// 通用工具函数
+// 通用工具函数 — 已迁移到 shared.js（toBase64/fromBase64/escapeHtml/
+// paxiToUpaxi/parseFloatToRawUnits/copyToClipboard/showToast/showStatus/
+// fetchAPI/buildSignAndBroadcast/checkTxResult/simulateGas/pollTxStatus/mapError）
 // ============================================================
-
-// 安全的 Uint8Array → Base64 转换（避免大数组栈溢出）
-function toBase64(bytes) {
-  let binary = '';
-  const chunkSize = 8192;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode.apply(null, chunk);
-  }
-  return btoa(binary);
-}
-
-// 安全的 Base64 → Uint8Array 转换
-function fromBase64(b64) {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-// 安全的字符串 → 大整数转换（避免浮点精度丢失）
-// 输入: "1.15" (PAXI), 返回: "1150000" (upaxi)
-function paxiToUpaxi(amountStr) {
-  const num = parseFloat(amountStr);
-  if (isNaN(num) || num < 0) return '0';
-  // 使用 toFixed 统一格式（自动处理科学计数法），再拆分
-  const fixedStr = num.toFixed(6);
-  const [intPart, decPart] = fixedStr.split('.');
-  try {
-    return (BigInt(intPart) * 1000000n + BigInt(decPart || '0')).toString();
-  } catch (e) {
-    return '0';
-  }
-}
-
-// 将人类可读金额转换为代币原始单位（支持任意精度）
-// 输入: "1.5", 6 → "1500000"
-// 输入: "1.5", 18 → "1500000000000000000"
-function parseFloatToRawUnits(amountStr, decimals) {
-  const num = parseFloat(amountStr);
-  if (isNaN(num) || num < 0) return '0';
-  // 使用 toFixed 统一格式（自动处理科学计数法）
-  const fixedStr = num.toFixed(decimals);
-  const [intPart, decPart] = fixedStr.split('.');
-  try {
-    return (BigInt(intPart) * BigInt(10 ** decimals) + BigInt(decPart || '0')).toString();
-  } catch (e) {
-    return '0';
-  }
-}
-
-// HTML 转义（防止 XSS）
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = String(str);
-  return div.innerHTML;
-}
-
-function showToast(msg, type = '') {
-  const existing = document.querySelector('.toast');
-  if (existing) existing.remove();
-  const toast = document.createElement('div');
-  toast.className = 'toast ' + type;
-  toast.textContent = msg;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
-}
-
-function showStatus(containerId, msg, type) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'status-msg ' + type;
-  el.style.display = 'block';
-}
-
-async function fetchAPI(path) {
-  const res = await fetch(`${CONFIG.lcd}${path}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
-}
 
 // ============================================================
 // 工具 1: 批量转账
@@ -646,32 +579,27 @@ async function executeBatchTransfer() {
   btn.innerHTML = '<span class="spinner"></span> 构建交易中...';
 
   try {
-    const chainId = CONFIG.chainId;
     const sender = state.wallet;
-
-    // Build account info
-    const accountRes = await fetch(`${CONFIG.lcd}/cosmos/auth/v1beta1/accounts/${sender.address}`);
-    const accountData = await accountRes.json();
-    const account = accountData.account?.base_account || accountData.account;
-    const accountNumber = Number(account.account_number);
-    const sequence = Number(account.sequence);
+    const denom = CONFIG.denom;
 
     // Build messages
     const messages = [];
-    const denom = CONFIG.denom;
 
-    // 计算手续费
-    // PAXI/PRC-20：按转账金额的 1.5% 收取（以 PAXI 原生代币支付）
-    // NFT：按笔数收费，每笔 0.5 PAXI（因为 token_id 不是金额，百分比无意义）
-    const NFT_TRANSFER_FEE_PER_TX = 0.5; // PAXI/笔
+    // 计算手续费（纯字符串运算避免精度丢失）
+    const NFT_TRANSFER_FEE_PER_TX = 0.5;
     let feeAmount, feeMicro;
     if (tokenType === 'nft') {
       feeAmount = state.batchRecipients.length * NFT_TRANSFER_FEE_PER_TX;
       feeMicro = paxiToUpaxi(feeAmount.toFixed(6));
     } else {
-      const totalAmount = state.batchRecipients.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
-      feeAmount = totalAmount * CONFIG.feeRate / 100; // 1.5%
-      feeMicro = paxiToUpaxi(feeAmount.toFixed(6));
+      // 使用字符串求和避免浮点累计误差
+      let totalMicro = BigInt(0);
+      for (const r of state.batchRecipients) {
+        totalMicro += BigInt(paxiToUpaxi(r.amount));
+      }
+      feeMicro = (totalMicro * BigInt(Math.round(CONFIG.feeRate * 100)) / BigInt(10000)).toString();
+      const feePaxiRaw = (BigInt(feeMicro) / BigInt(1000000)).toString() + '.' + (BigInt(feeMicro) % BigInt(1000000)).toString().padStart(6, '0').replace(/0+$/, '');
+      feeAmount = parseFloat(feePaxiRaw || '0');
     }
 
     // 对于 PRC-20，需要先查询代币精度
@@ -764,92 +692,33 @@ async function executeBatchTransfer() {
       }));
     }
 
-    // Build transaction
-    // Gas 计算：原生转账每条 ~80K，合约调用每条 ~200K，再加手续费消息
-    const gasPerMsg = tokenType === 'native' ? 90000 : 220000;
-    const totalGas = gasPerMsg * (messages.length - 1) + 90000; // 手续费消息按 90K
+    // 使用共享交易函数构建签名广播（Gas 自动估算）
     const feeNote = ` (含${CONFIG.feeRate}%手续费=${feeAmount.toFixed(4)}PAXI)`;
-    const txBody = PaxiCosmJS.TxBody.fromPartial({ messages, memo: `Paxi Toolbox Batch Transfer${feeNote}` });
-
-    const fee = {
-      amount: [PaxiCosmJS.coins(Math.floor(totalGas * 0.05).toString(), denom)[0]],
-      gasLimit: totalGas,
-    };
-
-    const pubkeyBytes = new Uint8Array(sender.public_key);
-    const pubkeyAny = {
-      typeUrl: '/cosmos.crypto.secp256k1.PubKey',
-      value: PaxiCosmJS.PubKey.encode({ key: pubkeyBytes }).finish(),
-    };
-
-    const authInfo = PaxiCosmJS.AuthInfo.fromPartial({
-      signerInfos: [{
-        publicKey: pubkeyAny,
-        modeInfo: { single: { mode: 1 } },
-        sequence: BigInt(sequence),
-      }],
-      fee,
-    });
-
-    const signDoc = PaxiCosmJS.SignDoc.fromPartial({
-      bodyBytes: PaxiCosmJS.TxBody.encode(txBody).finish(),
-      authInfoBytes: PaxiCosmJS.AuthInfo.encode(authInfo).finish(),
-      chainId,
-      accountNumber: BigInt(accountNumber),
-    });
-
-    // Sign via PaxiHub
+    const memo = `Paxi Toolbox Batch Transfer${feeNote}`;
     btn.innerHTML = '<span class="spinner"></span> 等待钱包签名...';
 
-    // 使用分块 Base64 编码，避免 spread 操作符导致大交易栈溢出
-    const txObj = {
-      bodyBytes: toBase64(signDoc.bodyBytes),
-      authInfoBytes: toBase64(signDoc.authInfoBytes),
-      chainId,
-      accountNumber: signDoc.accountNumber.toString(),
-    };
+    const broadcastRes = await buildSignAndBroadcast(messages, memo, null, sender);
+    const txResult = checkTxResult(broadcastRes);
 
-    const result = await window.paxihub.paxi.signAndSendTransaction(txObj);
-    if (!result || !result.success) {
-      throw new Error(result?.message || '钱包签名失败或被拒绝');
-    }
-
-    // 使用 fromBase64 安全解码签名
-    const sigBytes = fromBase64(result.success);
-    const txRaw = PaxiCosmJS.TxRaw.fromPartial({
-      bodyBytes: signDoc.bodyBytes,
-      authInfoBytes: signDoc.authInfoBytes,
-      signatures: [sigBytes],
-    });
-    const txBytes = PaxiCosmJS.TxRaw.encode(txRaw).finish();
-    const base64Tx = toBase64(txBytes);
-
-    // Broadcast
-    btn.innerHTML = '<span class="spinner"></span> 广播交易中...';
-
-    const broadcastRes = await fetch(`${CONFIG.lcd}/cosmos/tx/v1beta1/txs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tx_bytes: base64Tx, mode: 'BROADCAST_MODE_SYNC' }),
-    }).then(r => r.json());
-
-    if (broadcastRes.tx_response?.txhash && broadcastRes.tx_response.code === 0) {
+    if (txResult.ok) {
       const feeNoteText = tokenType === 'nft'
         ? ` 手续费 ${feeAmount.toFixed(4)} PAXI (${state.batchRecipients.length}笔×0.5PAXI)`
         : ` 手续费 ${feeAmount.toFixed(4)} PAXI (${CONFIG.feeRate}%)`;
       showStatus('btStatus',
-        `✅ 转账成功！${state.batchRecipients.length} 笔交易已发送。${feeNoteText} TxHash: ${broadcastRes.tx_response.txhash.slice(0, 20)}...`,
+        `✅ 转账成功！${state.batchRecipients.length} 笔交易已发送。${feeNoteText} TxHash: ${txResult.txhash.slice(0, 20)}...`,
         'success');
+      // 轮询交易确认
+      pollTxStatus(txResult.txhash).then(conf => {
+        if (conf.confirmed) showToast(conf.success ? '交易已上链确认' : '⚠️ 交易上链但执行失败', conf.success ? 'success' : 'error');
+      });
       clearBatchTransfer();
       refreshBalance();
     } else {
-      const errMsg = broadcastRes.tx_response?.raw_log || broadcastRes.message || '未知错误';
-      const errCode = broadcastRes.tx_response?.code || '?';
-      showStatus('btStatus', `❌ 交易失败（代码 ${errCode}）：${errMsg}`, 'error');
+      showStatus('btStatus', `❌ 交易失败：${mapError(txResult.code, txResult.rawLog)}`, 'error');
     }
   } catch (e) {
     console.error('Batch transfer error:', e);
-    showStatus('btStatus', '❌ 执行失败：' + e.message, 'error');
+    showStatus('btStatus', '❌ 执行失败：' + mapError(undefined, e.message), 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🚀 执行批量转账';
@@ -920,11 +789,8 @@ async function queryBalances() {
       if (result.status === 'fulfilled' && result.value.balances) {
         for (const b of result.value.balances) {
           if (b.denom === CONFIG.denom) {
-            // 使用字符串处理避免大数精度丢失
-            const amtStr = b.amount;
-            const intPart = amtStr.length > 6 ? amtStr.slice(0, -6) : '0';
-            const decPart = amtStr.length > 6 ? amtStr.slice(-6) : amtStr.padStart(6, '0');
-            paxiAmount = parseFloat(intPart + '.' + decPart);
+            // 使用 upaxiToPaxi 字符串转换避免大数精度丢失
+            paxiAmount = parseFloat(upaxiToPaxi(b.amount));
           } else {
             otherTokens.push(b);
           }
@@ -1478,4 +1344,1067 @@ async function queryTokenInfo() {
   } catch (e) {
     showStatus('tiStatus', '查询失败：' + e.message, 'error');
   }
+}
+
+// ============================================================
+// 更多面板（底部 tab "更多"展开的工具网格）
+// ============================================================
+function renderMorePanel() {
+  const tools = [
+    { tool: 'gas-calc', icon: '⛽', name: 'Gas计算', desc: '估算交易费用' },
+    { tool: 'address-convert', icon: '🔄', name: '地址转换', desc: 'Bech32 跨链' },
+    { tool: 'validator-compare', icon: '🏦', name: '验证节点', desc: '节点对比' },
+    { tool: 'token-info', icon: '🪙', name: '代币查询', desc: 'PRC-20 信息' },
+  ];
+  return `
+    <div class="card">
+      <div class="card-title">更多工具</div>
+      <div class="tool-desc">以下为高级工具，点击进入。</div>
+      <div class="more-grid">
+        ${tools.map(t => `
+          <div class="more-tool-card" onclick="switchToMoreTool('${t.tool}')">
+            <div class="more-tool-icon">${t.icon}</div>
+            <div class="more-tool-name">${t.name}</div>
+            <div class="more-tool-desc">${t.desc}</div>
+          </div>
+        `).join('')}
+        <a href="nft-launcher/index.html" class="more-tool-card" style="text-decoration:none;color:inherit">
+          <div class="more-tool-icon">🎨</div>
+          <div class="more-tool-name">NFT发射</div>
+          <div class="more-tool-desc">PRC-721 发行</div>
+        </a>
+      </div>
+    </div>
+  `;
+}
+
+function switchToMoreTool(tool) {
+  state.nftMarket.moreSubTool = tool;
+  state.currentTool = tool;
+  const main = document.getElementById('mainContent');
+  let content = '';
+  switch (tool) {
+    case 'gas-calc': content = renderGasCalc(); break;
+    case 'address-convert': content = renderAddressConvert(); break;
+    case 'validator-compare': content = renderValidatorCompare(); break;
+    case 'token-info': content = renderTokenInfo(); break;
+  }
+  main.innerHTML = `<div class="back-bar" onclick="backToMore()">← 返回更多</div>` + content;
+  bindToolEvents(tool);
+}
+
+function backToMore() {
+  state.nftMarket.moreSubTool = null;
+  state.currentTool = 'more';
+  renderTool('more');
+}
+
+// ============================================================
+// NFT 市场 — localStorage 辅助
+// ============================================================
+const LS_KEY_LISTINGS = 'paxi_nft_market_listings';
+const LS_KEY_IMPORTED = 'paxi_nft_market_imported';
+
+function getMarketListings() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY_LISTINGS) || '[]'); }
+  catch { return []; }
+}
+
+function saveListing(listing) {
+  const list = getMarketListings();
+  list.unshift(listing);
+  localStorage.setItem(LS_KEY_LISTINGS, JSON.stringify(list));
+}
+
+function removeListing(listingId) {
+  let list = getMarketListings();
+  list = list.filter(l => l.id !== listingId);
+  localStorage.setItem(LS_KEY_LISTINGS, JSON.stringify(list));
+}
+
+function updateListing(listingId, updates) {
+  const list = getMarketListings();
+  const idx = list.findIndex(l => l.id === listingId);
+  if (idx !== -1) {
+    list[idx] = { ...list[idx], ...updates };
+    localStorage.setItem(LS_KEY_LISTINGS, JSON.stringify(list));
+  }
+}
+
+function getImportedListings() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY_IMPORTED) || '[]'); }
+  catch { return []; }
+}
+
+function saveImportedListing(listing) {
+  const list = getImportedListings();
+  // 去重
+  if (!list.find(l => l.id === listing.id)) {
+    list.unshift(listing);
+    localStorage.setItem(LS_KEY_IMPORTED, JSON.stringify(list));
+  }
+}
+
+function removeImportedListing(listingId) {
+  let list = getImportedListings();
+  list = list.filter(l => l.id !== listingId);
+  localStorage.setItem(LS_KEY_IMPORTED, JSON.stringify(list));
+}
+
+// 合并展示所有可购买的 listing（自己的 + 导入的，排除已售/已下架）
+function getAllActiveListings() {
+  const own = getMarketListings().filter(l => l.status === 'listed' || l.status === 'granted');
+  const imported = getImportedListings().filter(l => l.status === 'listed' || l.status === 'granted');
+  // 合并去重
+  const seen = new Set();
+  const all = [...own, ...imported].filter(l => {
+    if (seen.has(l.id)) return false;
+    seen.add(l.id);
+    return true;
+  });
+  // 过滤已过期
+  return all.filter(l => new Date(l.expiresAt) > new Date());
+}
+
+// ============================================================
+// NFT 市场 — 分享码
+// ============================================================
+function generateShareCode(listing) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(listing))));
+}
+
+function parseShareCode(code) {
+  const json = decodeURIComponent(escape(atob(code.trim())));
+  return JSON.parse(json);
+}
+
+function generateBuyRequestCode(listing, buyer) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify({
+    type: 'buy_request',
+    listingId: listing.id,
+    contract: listing.contract,
+    tokenId: listing.tokenId,
+    price: listing.price,
+    seller: listing.seller,
+    buyer,
+    timestamp: new Date().toISOString(),
+  }))));
+}
+
+function parseBuyRequestCode(code) {
+  const json = decodeURIComponent(escape(atob(code.trim())));
+  return JSON.parse(json);
+}
+
+// ============================================================
+// NFT 市场 — 链上查询
+// ============================================================
+async function queryNftOwner(contract, tokenId) {
+  const queryMsg = { owner_of: { token_id: String(tokenId) } };
+  const encodedMsg = btoa(JSON.stringify(queryMsg));
+  const res = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${encodedMsg}`);
+  if (!res.ok) throw new Error(`查询 NFT owner 失败: HTTP ${res.status}`);
+  const data = await res.json();
+  return data.data?.owner;
+}
+
+async function queryNftInfo(contract, tokenId) {
+  // 尝试 all_nft_info（含 owner + metadata）
+  try {
+    const queryMsg = { all_nft_info: { token_id: String(tokenId) } };
+    const encodedMsg = btoa(JSON.stringify(queryMsg));
+    const res = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${encodedMsg}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.data) return data.data;
+    }
+  } catch (e) { /* 降级 */ }
+  // 降级：分别查 owner_of + nft_info
+  const owner = await queryNftOwner(contract, tokenId);
+  let info = {};
+  try {
+    const queryMsg = { nft_info: { token_id: String(tokenId) } };
+    const encodedMsg = btoa(JSON.stringify(queryMsg));
+    const res = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${encodedMsg}`);
+    if (res.ok) {
+      const data = await res.json();
+      info = data.data || {};
+    }
+  } catch (e) { /* 忽略 */ }
+  return {
+    access: { owner, approvals: [] },
+    info: { token_uri: info.token_uri || '', extension: info.extension || {} },
+  };
+}
+
+async function checkGrantStatus(seller, buyer) {
+  const url = `${CONFIG.lcd}/cosmos/authz/v1beta1/grants?granter=${seller}&grantee=${buyer}&msg_type_url=${encodeURIComponent(CONFIG.nftMarket.msgTypeUrl)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`查询授权失败: HTTP ${res.status}`);
+  const data = await res.json();
+  const grants = data.grants || [];
+  if (grants.length === 0) return null;
+  const grant = grants[0];
+  // 检查是否过期
+  const exp = grant.expiration ? new Date(grant.expiration) : null;
+  if (exp && exp < new Date()) return null; // 已过期
+  return grant;
+}
+
+// ============================================================
+// NFT 市场 — UI 渲染
+// ============================================================
+function renderNftMarket() {
+  // 如果有进行中的购买流程，显示购买页
+  if (state.nftMarket.currentBuy) {
+    return renderBuyFlow();
+  }
+
+  const sub = state.nftMarket.subTab;
+  const tabs = [
+    { key: 'browse', label: '市场浏览' },
+    { key: 'list', label: '上架NFT' },
+    { key: 'mine', label: '我的订单' },
+    { key: 'import', label: '导入' },
+  ];
+
+  let content = '';
+  switch (sub) {
+    case 'browse': content = renderMarketBrowse(); break;
+    case 'list': content = renderMarketListForm(); break;
+    case 'mine': content = renderMarketMine(); break;
+    case 'import': content = renderMarketImport(); break;
+  }
+
+  return `
+    <div class="card">
+      <div class="card-title">🏪 NFT 市场</div>
+      <div class="tool-desc">
+        基于 Authz 原子交换的去中心化 NFT 交易。卖家上架 → 授权 → 买家一笔交易同时付款+到账，链上原子执行。
+      </div>
+      <div class="sub-tabs">
+        ${tabs.map(t => `<div class="sub-tab ${sub === t.key ? 'active' : ''}" data-nft-tab="${t.key}">${t.label}</div>`).join('')}
+      </div>
+    </div>
+    ${content}
+  `;
+}
+
+function bindNftMarketEvents() {
+  document.querySelectorAll('[data-nft-tab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      state.nftMarket.subTab = tab.dataset.nftTab;
+      renderTool('nft-market');
+    });
+  });
+  // 导入页：渲染已有列表
+  if (state.nftMarket.subTab === 'import') {
+    renderImportedList();
+  }
+  // 购买流程页：填充购买请求码
+  if (state.nftMarket.currentBuy) {
+    const codeEl = document.getElementById('buyReqCode');
+    if (codeEl) {
+      const code = generateBuyRequestCode(state.nftMarket.currentBuy.listing, state.wallet.address);
+      codeEl.textContent = code;
+    }
+  }
+}
+
+// 滚动到授权面板
+function scrollToGrantPanel() {
+  const el = document.getElementById('grantBuyRequest');
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.focus();
+  }
+}
+
+function renderMarketBrowse() {
+  const listings = getAllActiveListings();
+  if (listings.length === 0) {
+    return `
+      <div class="card">
+        <div style="text-align:center;padding:32px 16px;color:var(--text-muted)">
+          <div style="font-size:40px;margin-bottom:12px">🏪</div>
+          <div style="font-size:14px;margin-bottom:8px">暂无在售 NFT</div>
+          <div style="font-size:12px">从卖家获取分享码，在「导入」页粘贴即可浏览</div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="nft-market-grid">
+      ${listings.map(l => {
+        const isOwn = l.seller === state.wallet?.address;
+        const expired = new Date(l.expiresAt) < new Date();
+        return `
+          <div class="nft-card">
+            <div class="nft-card-img">
+              ${l.image ? `<img src="${sanitizeUrl(l.image)}" alt="NFT" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
+              <div class="nft-card-placeholder" style="${l.image ? 'display:none' : 'display:flex'}">🎨</div>
+            </div>
+            <div class="nft-card-body">
+              <div class="nft-card-name">${escapeHtml(l.name || 'NFT #' + l.tokenId)}</div>
+              <div class="nft-card-meta">Token #${escapeHtml(l.tokenId)}</div>
+              <div class="nft-card-price">${escapeHtml(l.price)} PAXI</div>
+              <div class="nft-card-seller">卖家: ${escapeHtml(l.seller.slice(0, 10))}...${escapeHtml(l.seller.slice(-4))}</div>
+              ${expired
+                ? '<div class="nft-card-badge" style="color:var(--danger)">已过期</div>'
+                : isOwn
+                  ? '<div class="nft-card-badge" style="color:var(--text-muted)">我的</div>'
+                  : `<button class="btn btn-primary btn-block" onclick="startBuyFlow('${l.id}')">购买</button>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderMarketListForm() {
+  return `
+    <div class="card">
+      <div class="card-title">📤 上架 NFT</div>
+      <div class="tool-desc">
+        填写 NFT 合约地址和 Token ID，系统将查询链上信息确认你持有该 NFT，
+        然后生成分享码供买家导入。上架免费，授权时收取 ${CONFIG.nftMarket.listingFee} PAXI 服务费。
+      </div>
+      <div class="form-group">
+        <label class="form-label">NFT 合约地址 *</label>
+        <input type="text" id="nmContract" placeholder="paxi1...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Token ID *</label>
+          <input type="text" id="nmTokenId" placeholder="例如：1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">售价 (PAXI) *</label>
+          <input type="number" id="nmPrice" placeholder="100" step="0.01" min="0">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="queryNftForListing()">🔍 查询NFT信息</button>
+        <button class="btn btn-primary" id="btnListNft" onclick="listNft()">📤 上架</button>
+      </div>
+      <div id="nmPreview" style="margin-top:16px"></div>
+      <div class="status-msg" id="nmStatus"></div>
+    </div>
+  `;
+}
+
+function renderMarketMine() {
+  const listings = getMarketListings();
+  if (listings.length === 0) {
+    return `
+      <div class="card">
+        <div style="text-align:center;padding:32px 16px;color:var(--text-muted)">
+          <div style="font-size:40px;margin-bottom:12px">📋</div>
+          <div style="font-size:14px">暂无上架记录</div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="card">
+      <div class="card-title">📋 我的上架</div>
+      ${listings.map(l => {
+        const expired = new Date(l.expiresAt) < new Date();
+        const statusLabel = l.status === 'sold' ? '已售' : l.status === 'delisted' ? '已下架' : expired ? '已过期' : l.status === 'granted' ? '已授权' : '在售';
+        const statusColor = l.status === 'sold' ? 'var(--success)' : l.status === 'delisted' ? 'var(--text-muted)' : expired ? 'var(--danger)' : l.status === 'granted' ? 'var(--warning)' : 'var(--primary)';
+        return `
+          <div class="listing-item">
+            <div class="listing-item-main">
+              <div class="listing-item-name">${escapeHtml(l.name || 'NFT #' + l.tokenId)}</div>
+              <div class="listing-item-meta">
+                Token #${escapeHtml(l.tokenId)} · ${escapeHtml(l.price)} PAXI
+              </div>
+              <div class="listing-item-meta">
+                <code style="word-break:break-all;font-size:10px">${escapeHtml(l.contract.slice(0, 16))}...</code>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                <span style="font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(99,102,241,0.15);color:${statusColor}">${statusLabel}</span>
+                <span style="font-size:11px;color:var(--text-muted)">${new Date(l.createdAt).toLocaleDateString()}</span>
+              </div>
+            </div>
+            <div class="listing-item-actions">
+              ${(l.status === 'listed' || l.status === 'granted') && !expired
+                ? `<button class="btn btn-outline btn-sm" onclick="copyShareCode('${l.id}')">📋 分享码</button>`
+                : ''}
+              ${l.status === 'listed' && !expired
+                ? `<button class="btn btn-outline btn-sm" onclick="scrollToGrantPanel()">🔑 授权</button>`
+                : ''}
+              ${l.status === 'granted' && l.grantee && !expired
+                ? `<button class="btn btn-danger btn-sm" onclick="revokeGrant('${l.grantee}','${l.id}')">撤销授权</button>`
+                : ''}
+              ${l.status !== 'sold'
+                ? `<button class="btn btn-outline btn-sm" onclick="delistNft('${l.id}')">下架</button>`
+                : ''}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <!-- 授权面板 -->
+    <div class="card">
+      <div class="card-title">🔑 授权买家</div>
+      <div class="tool-desc">
+        买家向你发送购买请求码后，在此粘贴并授权。授权后买家可在 <strong style="color:var(--warning)">${CONFIG.nftMarket.grantDurationSec / 60} 分钟</strong>内执行购买。
+      </div>
+      <div class="info-box" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3)">
+        <strong style="color:var(--warning)">⚠️ 安全提示：</strong>
+        Authz 授权按消息类型生效，买家可在有效期内代表你执行任意 <code>MsgExecuteContract</code>。
+        请仅授权给信任的买家，授权时长已缩短至 ${CONFIG.nftMarket.grantDurationSec / 60} 分钟。成交或下架后授权将自动失效。
+      </div>
+      <div class="form-group">
+        <label class="form-label">购买请求码</label>
+        <textarea id="grantBuyRequest" placeholder="粘贴买家发来的购买请求码..." style="min-height:100px"></textarea>
+      </div>
+      <button class="btn btn-primary" id="btnGrantNft" onclick="grantNft()">🔑 授权交易</button>
+      <div class="status-msg" id="grantStatus"></div>
+    </div>
+  `;
+}
+
+function renderMarketImport() {
+  return `
+    <div class="card">
+      <div class="card-title">📥 导入 NFT 订单</div>
+      <div class="tool-desc">
+        粘贴卖家分享的 NFT 上架码，导入后可在「市场浏览」中查看和购买。
+      </div>
+      <div class="form-group">
+        <label class="form-label">分享码</label>
+        <textarea id="importCode" placeholder="粘贴卖家分享的上架码..." style="min-height:100px"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="importListing()">📥 导入</button>
+      <div class="status-msg" id="importStatus"></div>
+    </div>
+    <!-- 已导入列表 -->
+    <div class="card">
+      <div class="card-title">📥 已导入的订单</div>
+      <div id="importedList"></div>
+    </div>
+  `;
+}
+
+function renderImportedList() {
+  const list = getImportedListings();
+  const el = document.getElementById('importedList');
+  if (!el) return;
+  if (list.length === 0) {
+    el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">暂无导入的订单</p>';
+    return;
+  }
+  el.innerHTML = list.map(l => {
+    const expired = new Date(l.expiresAt) < new Date();
+    return `
+      <div class="listing-item">
+        <div class="listing-item-main">
+          <div class="listing-item-name">${escapeHtml(l.name || 'NFT #' + l.tokenId)}</div>
+          <div class="listing-item-meta">Token #${escapeHtml(l.tokenId)} · ${escapeHtml(l.price)} PAXI</div>
+          <div class="listing-item-meta">卖家: ${escapeHtml(l.seller.slice(0, 12))}...${escapeHtml(l.seller.slice(-4))}</div>
+          ${expired ? '<span style="font-size:11px;color:var(--danger)">已过期</span>' : ''}
+        </div>
+        <div class="listing-item-actions">
+          <button class="btn btn-outline btn-sm" onclick="removeImportedListing('${l.id}');renderImportedList();">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// 购买流程 UI
+// ============================================================
+function renderBuyFlow() {
+  const buy = state.nftMarket.currentBuy;
+  if (!buy) return '';
+  const l = buy.listing;
+  const step = buy.step;
+  const fee = (parseFloat(l.price) * CONFIG.nftMarket.buyFeeRate / 100).toFixed(4);
+  const total = (parseFloat(l.price) + parseFloat(fee)).toFixed(6);
+
+  return `
+    <div class="card">
+      <div class="back-bar" onclick="cancelBuyFlow()">← 返回市场</div>
+      <div class="card-title">🛒 购买 NFT</div>
+      <div class="nft-buy-detail">
+        <div class="nft-card-img" style="width:120px;height:120px;margin:0 auto 12px">
+          ${l.image ? `<img src="${sanitizeUrl(l.image)}" style="width:120px;height:120px;border-radius:12px;object-fit:cover" onerror="this.style.display='none'">` : '<div style="width:120px;height:120px;border-radius:12px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:40px">🎨</div>'}
+        </div>
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-weight:700">${escapeHtml(l.name || 'NFT #' + l.tokenId)}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Token #${escapeHtml(l.tokenId)}</div>
+        </div>
+        <div class="price-breakdown">
+          <div class="price-row"><span>售价</span><span>${escapeHtml(l.price)} PAXI</span></div>
+          <div class="price-row"><span>平台费 (${CONFIG.nftMarket.buyFeeRate}%)</span><span>${fee} PAXI</span></div>
+          <div class="price-row total"><span>合计</span><span>${total} PAXI</span></div>
+        </div>
+      </div>
+
+      <!-- 步骤指示 -->
+      <div class="buy-steps">
+        <div class="buy-step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'done' : ''}">
+          <div class="buy-step-num">${step > 1 ? '✓' : '1'}</div>
+          <div class="buy-step-label">复制地址</div>
+        </div>
+        <div class="buy-step-line ${step > 1 ? 'done' : ''}"></div>
+        <div class="buy-step ${step >= 2 ? 'active' : ''} ${step > 2 ? 'done' : ''}">
+          <div class="buy-step-num">${step > 2 ? '✓' : '2'}</div>
+          <div class="buy-step-label">等待授权</div>
+        </div>
+        <div class="buy-step-line"></div>
+        <div class="buy-step ${step >= 3 ? 'active' : ''}">
+          <div class="buy-step-num">3</div>
+          <div class="buy-step-label">执行购买</div>
+        </div>
+      </div>
+
+      ${step === 1 ? `
+        <div class="buy-step-content">
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            将以下地址或购买请求码发送给卖家，卖家授权后进入下一步。
+          </p>
+          <div class="copy-box">
+            <label class="form-label">你的钱包地址</label>
+            <div class="copy-row">
+              <code style="flex:1;word-break:break-all;font-size:11px">${escapeHtml(state.wallet?.address || '')}</code>
+              <button class="btn btn-outline btn-sm" onclick="copyToClipboard('${state.wallet?.address || ''}').then(()=>showToast('已复制','success'))">📋</button>
+            </div>
+          </div>
+          <div class="copy-box">
+            <label class="form-label">购买请求码（含NFT信息，推荐）</label>
+            <div class="copy-row">
+              <code id="buyReqCode" style="flex:1;word-break:break-all;font-size:10px"></code>
+              <button class="btn btn-outline btn-sm" id="btnCopyBuyReq" onclick="copyBuyReqCode()">📋</button>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-block" onclick="advanceBuyStep(2)">已发送，下一步 →</button>
+        </div>
+      ` : ''}
+
+      ${step === 2 ? `
+        <div class="buy-step-content">
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            确认卖家已授权后，点击下方检查授权状态。
+          </p>
+          <button class="btn btn-outline btn-block" onclick="checkBuyGrant()">🔍 检查授权状态</button>
+          <div class="status-msg" id="buyGrantStatus"></div>
+          <button class="btn btn-primary btn-block" id="btnBuyStep3" style="margin-top:12px;display:none" onclick="advanceBuyStep(3)">授权确认，执行购买 →</button>
+        </div>
+      ` : ''}
+
+      ${step === 3 ? `
+        <div class="buy-step-content">
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            点击执行原子购买，一笔交易同时付款 + NFT 到账。
+          </p>
+          <button class="btn btn-success btn-block" id="btnExecuteBuy" onclick="executeBuy()">🚀 执行原子购买</button>
+          <div class="status-msg" id="buyExecuteStatus"></div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+// ============================================================
+// NFT 市场 — 操作
+// ============================================================
+
+// 查询 NFT 信息（上架表单中）
+async function queryNftForListing() {
+  const contract = document.getElementById('nmContract')?.value.trim();
+  const tokenId = document.getElementById('nmTokenId')?.value.trim();
+  const preview = document.getElementById('nmPreview');
+  if (!contract || !tokenId) {
+    showStatus('nmStatus', '请填写合约地址和 Token ID', 'warning');
+    return;
+  }
+  showStatus('nmStatus', '查询中...', 'info');
+  try {
+    const info = await queryNftInfo(contract, tokenId);
+    const owner = info.access?.owner;
+    const ext = info.info?.extension || {};
+    const name = ext.name || ext.token_name || '';
+    const image = ext.image || ext.image_url || '';
+    const isOwner = state.wallet && owner === state.wallet.address;
+    preview.innerHTML = `
+      <div class="nft-preview-box">
+        ${image ? `<img src="${sanitizeUrl(image)}" style="width:100px;height:100px;border-radius:8px;object-fit:cover" onerror="this.style.display='none'">` : '<div style="width:100px;height:100px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:32px">🎨</div>'}
+        <div>
+          <div style="font-weight:700">${escapeHtml(name || 'NFT #' + tokenId)}</div>
+          <div style="font-size:12px;color:var(--text-muted)">Token #${escapeHtml(tokenId)}</div>
+          <div style="font-size:12px;margin-top:4px">
+            持有者: <code style="font-size:10px">${escapeHtml(owner ? owner.slice(0,14)+'...' : '未知')}</code>
+          </div>
+          <div style="font-size:12px;margin-top:4px;color:${isOwner ? 'var(--success)' : 'var(--danger)'}">
+            ${isOwner ? '✅ 你持有此 NFT' : '❌ 你不是此 NFT 的持有者'}
+          </div>
+        </div>
+      </div>
+    `;
+    showStatus('nmStatus', '', '');
+    document.getElementById('nmStatus').style.display = 'none';
+  } catch (e) {
+    showStatus('nmStatus', '查询失败：' + e.message, 'error');
+    preview.innerHTML = '';
+  }
+}
+
+// 上架 NFT
+async function listNft() {
+  if (!state.connected) {
+    showToast('请先连接钱包', 'error');
+    return;
+  }
+  const contract = document.getElementById('nmContract').value.trim();
+  const tokenId = document.getElementById('nmTokenId').value.trim();
+  const priceStr = document.getElementById('nmPrice').value.trim();
+  if (!contract || !tokenId || !priceStr) {
+    showStatus('nmStatus', '请填写所有必填项', 'warning');
+    return;
+  }
+  const price = parseFloat(priceStr);
+  if (isNaN(price) || price <= 0) {
+    showStatus('nmStatus', '价格必须大于 0', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('btnListNft');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 上架中...';
+
+  try {
+    // 查询 NFT 信息确认持有
+    const info = await queryNftInfo(contract, tokenId);
+    const owner = info.access?.owner;
+    if (!owner) {
+      throw new Error('无法查询 NFT 持有者');
+    }
+    if (owner !== state.wallet.address) {
+      throw new Error('你不是此 NFT 的持有者');
+    }
+
+    // 重复上架检查：同一合约+tokenId 不可重复上架
+    const existingListings = getMarketListings();
+    const duplicate = existingListings.find(l =>
+      l.contract === contract &&
+      l.tokenId === String(tokenId) &&
+      (l.status === 'listed' || l.status === 'granted') &&
+      new Date(l.expiresAt) > new Date()
+    );
+    if (duplicate) {
+      throw new Error('此 NFT 已在售（已上架且未过期），请先下架再重新上架');
+    }
+
+    const ext = info.info?.extension || {};
+    const name = ext.name || ext.token_name || `NFT #${tokenId}`;
+    const image = ext.image || ext.image_url || '';
+
+    const now = new Date();
+    const listing = {
+      id: 'lst_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      contract,
+      tokenId: String(tokenId),
+      price: priceStr,
+      priceMicro: paxiToUpaxi(priceStr),
+      seller: state.wallet.address,
+      name,
+      image,
+      createdAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + CONFIG.nftMarket.listingDurationSec * 1000).toISOString(),
+      status: 'listed',
+    };
+
+    saveListing(listing);
+
+    // 生成分享码
+    const shareCode = generateShareCode(listing);
+
+    showStatus('nmStatus', '✅ 上架成功！', 'success');
+    document.getElementById('nmPreview').innerHTML = `
+      <div class="info-box">
+        <strong>📋 分享码（发送给买家）：</strong>
+        <div class="copy-row" style="margin-top:8px">
+          <code id="listShareCode" style="flex:1;word-break:break-all;font-size:10px">${escapeHtml(shareCode)}</code>
+          <button class="btn btn-outline btn-sm" onclick="copyToClipboard('${shareCode}').then(()=>showToast('已复制','success'))">📋</button>
+        </div>
+      </div>
+    `;
+
+    showToast('上架成功！', 'success');
+  } catch (e) {
+    showStatus('nmStatus', '❌ 上架失败：' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '📤 上架';
+  }
+}
+
+// 复制分享码
+function copyShareCode(listingId) {
+  const listing = getMarketListings().find(l => l.id === listingId);
+  if (!listing) return;
+  const code = generateShareCode(listing);
+  copyToClipboard(code).then(() => showToast('分享码已复制', 'success'));
+}
+
+// 导入订单
+function importListing() {
+  const code = document.getElementById('importCode').value.trim();
+  if (!code) {
+    showStatus('importStatus', '请粘贴分享码', 'warning');
+    return;
+  }
+  try {
+    const listing = parseShareCode(code);
+    if (!listing.contract || !listing.tokenId || !listing.seller || !listing.price) {
+      throw new Error('分享码格式不正确');
+    }
+    saveImportedListing(listing);
+    showStatus('importStatus', `✅ 导入成功：${escapeHtml(listing.name || 'NFT #' + listing.tokenId)}`, 'success');
+    document.getElementById('importCode').value = '';
+    renderImportedList();
+  } catch (e) {
+    showStatus('importStatus', '❌ 导入失败：' + e.message, 'error');
+  }
+}
+
+// 开始购买流程
+function startBuyFlow(listingId) {
+  if (!state.connected) {
+    showToast('请先连接钱包', 'error');
+    return;
+  }
+  const listings = getAllActiveListings();
+  const listing = listings.find(l => l.id === listingId);
+  if (!listing) {
+    showToast('订单不存在或已过期', 'error');
+    return;
+  }
+  if (listing.seller === state.wallet.address) {
+    showToast('不能购买自己的 NFT', 'error');
+    return;
+  }
+  state.nftMarket.currentBuy = { listing, step: 1 };
+  renderTool('nft-market');
+}
+
+function cancelBuyFlow() {
+  state.nftMarket.currentBuy = null;
+  state.nftMarket.subTab = 'browse';
+  renderTool('nft-market');
+}
+
+function advanceBuyStep(step) {
+  if (state.nftMarket.currentBuy) {
+    state.nftMarket.currentBuy.step = step;
+    renderTool('nft-market');
+  }
+}
+
+// 生成并复制购买请求码
+function copyBuyReqCode() {
+  const buy = state.nftMarket.currentBuy;
+  if (!buy) return;
+  const code = generateBuyRequestCode(buy.listing, state.wallet.address);
+  copyToClipboard(code).then(() => showToast('购买请求码已复制', 'success'));
+}
+
+// 检查买家收到的授权
+async function checkBuyGrant() {
+  const buy = state.nftMarket.currentBuy;
+  if (!buy) return;
+  const seller = buy.listing.seller;
+  const buyer = state.wallet.address;
+  showStatus('buyGrantStatus', '查询授权中...', 'info');
+  try {
+    const grant = await checkGrantStatus(seller, buyer);
+    if (grant) {
+      showStatus('buyGrantStatus', '✅ 卖家已授权！可以执行购买了', 'success');
+      document.getElementById('btnBuyStep3').style.display = 'inline-flex';
+    } else {
+      showStatus('buyGrantStatus', '⏳ 卖家尚未授权，或授权已过期。请提醒卖家授权。', 'warning');
+    }
+  } catch (e) {
+    showStatus('buyGrantStatus', '❌ 查询失败：' + e.message, 'error');
+  }
+}
+
+// 卖家授权买家
+async function grantNft() {
+  if (!state.connected) {
+    showToast('请先连接钱包', 'error');
+    return;
+  }
+  const code = document.getElementById('grantBuyRequest').value.trim();
+  if (!code) {
+    showStatus('grantStatus', '请粘贴购买请求码', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('btnGrantNft');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 授权中...';
+
+  try {
+    const req = parseBuyRequestCode(code);
+    if (req.type !== 'buy_request' || !req.buyer) {
+      throw new Error('购买请求码格式不正确');
+    }
+    if (req.seller !== state.wallet.address) {
+      throw new Error('此购买请求不是发给你');
+    }
+
+    // 验证 listing 存在
+    const listings = getMarketListings();
+    const listing = listings.find(l => l.id === req.listingId);
+    if (!listing) {
+      throw new Error('找不到对应的上架记录');
+    }
+
+    // 构建 MsgGrant
+    const now = Math.floor(Date.now() / 1000);
+    const expiration = {
+      seconds: BigInt(now + CONFIG.nftMarket.grantDurationSec),
+      nanos: 0,
+    };
+
+    // GenericAuthorization: 授权执行 MsgExecuteContract
+    const genericAuthBytes = PaxiCosmJS.GenericAuthorization.encode({
+      msg: CONFIG.nftMarket.msgTypeUrl,
+    }).finish();
+
+    const authorization = {
+      typeUrl: '/cosmos.authz.v1beta1.GenericAuthorization',
+      value: genericAuthBytes,
+    };
+
+    const grant = {
+      authorization,
+      expiration,
+    };
+
+    const grantMsg = PaxiCosmJS.MsgGrant.fromPartial({
+      granter: state.wallet.address,
+      grantee: req.buyer,
+      grant,
+    });
+
+    const messages = [PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmos.authz.v1beta1.MsgGrant',
+      value: PaxiCosmJS.MsgGrant.encode(grantMsg).finish(),
+    })];
+
+    // 上架服务费
+    const feeMicro = paxiToUpaxi(CONFIG.nftMarket.listingFee.toFixed(6));
+    const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
+      fromAddress: state.wallet.address,
+      toAddress: CONFIG.feeCollector,
+      amount: [PaxiCosmJS.coins(feeMicro, CONFIG.denom)[0]],
+    });
+    messages.push(PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+      value: PaxiCosmJS.MsgSend.encode(feeMsg).finish(),
+    }));
+
+    btn.innerHTML = '<span class="spinner"></span> 等待签名...';
+
+    const memo = `Paxi NFT Market: Grant to ${req.buyer.slice(0, 12)}... | Fee: ${CONFIG.nftMarket.listingFee} PAXI`;
+    const res = await buildSignAndBroadcast(messages, memo, 300000, state.wallet);
+    const txResult = checkTxResult(res);
+
+    if (txResult.ok) {
+      // 更新 listing 状态
+      updateListing(listing.id, { status: 'granted', grantee: req.buyer });
+
+      showStatus('grantStatus', `✅ 授权成功！买家可在 ${CONFIG.nftMarket.grantDurationSec / 60} 分钟内执行购买。TxHash: ${txResult.txhash.slice(0, 20)}...`, 'success');
+      // 轮询交易确认
+      pollTxStatus(txResult.txhash).then(conf => {
+        if (conf.confirmed && conf.success) {
+          showToast('交易已上链确认', 'success');
+        } else if (conf.confirmed && !conf.success) {
+          showToast('交易上链但执行失败', 'error');
+        }
+      });
+      document.getElementById('grantBuyRequest').value = '';
+      showToast('授权成功', 'success');
+      // 刷新我的订单
+      setTimeout(() => {
+        state.nftMarket.subTab = 'mine';
+        renderTool('nft-market');
+      }, 2000);
+    } else {
+      showStatus('grantStatus', `❌ 授权失败：${mapError(txResult.code, txResult.rawLog)}`, 'error');
+    }
+  } catch (e) {
+    console.error('Grant error:', e);
+    showStatus('grantStatus', '❌ 授权失败：' + mapError(undefined, e.message), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔑 授权交易';
+  }
+}
+
+// 撤销授权
+async function revokeGrant(grantee, listingId) {
+  if (!state.connected) {
+    showToast('请先连接钱包', 'error');
+    return;
+  }
+  if (!confirm('确定撤销对该买家的授权？')) return;
+
+  try {
+    const revokeMsg = PaxiCosmJS.MsgRevoke.fromPartial({
+      granter: state.wallet.address,
+      grantee,
+      msgTypeUrl: CONFIG.nftMarket.msgTypeUrl,
+    });
+    const messages = [PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmos.authz.v1beta1.MsgRevoke',
+      value: PaxiCosmJS.MsgRevoke.encode(revokeMsg).finish(),
+    })];
+
+    showToast('等待签名...', 'info');
+    const res = await buildSignAndBroadcast(messages, 'Paxi NFT Market: Revoke grant', 200000, state.wallet);
+    const txResult = checkTxResult(res);
+
+    if (txResult.ok) {
+      updateListing(listingId, { status: 'listed', grantee: null });
+      showToast('授权已撤销', 'success');
+      // 轮询确认
+      pollTxStatus(txResult.txhash).then(conf => {
+        if (conf.confirmed) showToast(conf.success ? '撤销已上链' : '撤销交易失败', conf.success ? 'success' : 'error');
+      });
+      renderTool('nft-market');
+    } else {
+      showToast('撤销失败：' + mapError(txResult.code, txResult.rawLog), 'error');
+    }
+  } catch (e) {
+    showToast('撤销失败：' + mapError(undefined, e.message), 'error');
+  }
+}
+
+// 执行原子购买
+async function executeBuy() {
+  const buy = state.nftMarket.currentBuy;
+  if (!buy) return;
+  const l = buy.listing;
+
+  const btn = document.getElementById('btnExecuteBuy');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 构建交易...';
+
+  try {
+    // 再次检查授权状态
+    const grant = await checkGrantStatus(l.seller, state.wallet.address);
+    if (!grant) {
+      throw new Error('卖家授权已失效或不存在，请提醒卖家重新授权');
+    }
+
+    const messages = [];
+
+    // 1. 付款给卖家 (MsgSend)
+    const priceMicro = l.priceMicro || paxiToUpaxi(l.price);
+    const payMsg = PaxiCosmJS.MsgSend.fromPartial({
+      fromAddress: state.wallet.address,
+      toAddress: l.seller,
+      amount: [PaxiCosmJS.coins(priceMicro, CONFIG.denom)[0]],
+    });
+    messages.push(PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+      value: PaxiCosmJS.MsgSend.encode(payMsg).finish(),
+    }));
+
+    // 2. 平台费 (MsgSend 给 feeCollector)
+    const feeAmount = parseFloat(l.price) * CONFIG.nftMarket.buyFeeRate / 100;
+    const feeMicro = paxiToUpaxi(feeAmount.toFixed(6));
+    if (feeMicro !== '0') {
+      const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
+        fromAddress: state.wallet.address,
+        toAddress: CONFIG.feeCollector,
+        amount: [PaxiCosmJS.coins(feeMicro, CONFIG.denom)[0]],
+      });
+      messages.push(PaxiCosmJS.Any.fromPartial({
+        typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+        value: PaxiCosmJS.MsgSend.encode(feeMsg).finish(),
+      }));
+    }
+
+    // 3. 代转 NFT (MsgExec 内嵌 MsgExecuteContract)
+    //    sender = 卖家（granter），SDK 会校验 signer == granter
+    const transferMsg = {
+      transfer_nft: {
+        recipient: state.wallet.address,
+        token_id: String(l.tokenId),
+      },
+    };
+    const innerExecMsg = PaxiCosmJS.MsgExecuteContract.fromPartial({
+      sender: l.seller,  // granter 地址
+      contract: l.contract,
+      msg: new TextEncoder().encode(JSON.stringify(transferMsg)),
+    });
+    const innerAny = {
+      typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+      value: PaxiCosmJS.MsgExecuteContract.encode(innerExecMsg).finish(),
+    };
+
+    const execMsg = PaxiCosmJS.MsgExec.fromPartial({
+      grantee: state.wallet.address,
+      msgs: [innerAny],
+    });
+    messages.push(PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmos.authz.v1beta1.MsgExec',
+      value: PaxiCosmJS.MsgExec.encode(execMsg).finish(),
+    }));
+
+    btn.innerHTML = '<span class="spinner"></span> 等待签名...';
+
+    const memo = `Paxi NFT Market: Buy ${l.name || 'NFT #'+l.tokenId} | ${l.price} PAXI`;
+    const res = await buildSignAndBroadcast(messages, memo, 600000, state.wallet);
+    const txResult = checkTxResult(res);
+
+    if (txResult.ok) {
+      showStatus('buyExecuteStatus',
+        `✅ 购买成功！NFT 已到账。TxHash: ${txResult.txhash.slice(0, 20)}...`,
+        'success');
+      // 从列表移除
+      removeListing(l.id);
+      removeImportedListing(l.id);
+      btn.style.display = 'none';
+      showToast('🎉 购买成功！NFT 已到账', 'success');
+      // 轮询交易确认
+      pollTxStatus(txResult.txhash).then(conf => {
+        if (conf.confirmed && conf.success) {
+          showToast('交易已上链确认', 'success');
+        } else if (conf.confirmed && !conf.success) {
+          showToast('⚠️ 交易上链但执行失败：' + mapError(conf.code, conf.rawLog), 'error');
+        }
+      });
+      setTimeout(() => {
+        cancelBuyFlow();
+        refreshBalance();
+      }, 3000);
+    } else {
+      showStatus('buyExecuteStatus', `❌ 购买失败：${mapError(txResult.code, txResult.rawLog)}`, 'error');
+    }
+  } catch (e) {
+    console.error('Buy error:', e);
+    showStatus('buyExecuteStatus', '❌ 执行失败：' + mapError(undefined, e.message), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🚀 执行原子购买';
+  }
+}
+
+// 下架
+function delistNft(listingId) {
+  if (!confirm('确定下架此 NFT？')) return;
+  removeListing(listingId);
+  showToast('已下架', 'success');
+  renderTool('nft-market');
 }

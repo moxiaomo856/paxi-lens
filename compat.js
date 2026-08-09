@@ -153,6 +153,163 @@
   };
 
   // ============================================================
+  // Any 编码（用于 Grant 内嵌套的 authorization 字段）
+  // protobuf: google.protobuf.Any
+  // { string type_url = 1; bytes value = 2; }
+  // ============================================================
+  const AnyEncode = {
+    encode(data) {
+      return {
+        finish: () => concatBytes(
+          encodeLenDelim(1, data.typeUrl),
+          encodeLenDelim(2, data.value),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
+  // GenericAuthorization 编码
+  // protobuf: cosmos.authz.v1beta1.GenericAuthorization
+  // { string msg = 1; }  // msg = 授权的消息类型 typeUrl
+  // ============================================================
+  const GenericAuthorization = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      return { finish: () => encodeLenDelim(1, data.msg) };
+    },
+  };
+
+  // ============================================================
+  // Timestamp 编码
+  // protobuf: google.protobuf.Timestamp
+  // { int64 seconds = 1; int32 nanos = 2; }
+  // ============================================================
+  const Timestamp = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      return {
+        finish: () => concatBytes(
+          encodeVarintField(1, data.seconds),
+          encodeVarintField(2, data.nanos || 0),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
+  // Grant 编码
+  // protobuf: cosmos.authz.v1beta1.Grant
+  // { Any authorization = 1; Timestamp expiration = 2; }
+  // ============================================================
+  const Grant = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const authBytes = AnyEncode.encode(data.authorization).finish();
+      const expBytes = Timestamp.encode(data.expiration).finish();
+      return {
+        finish: () => concatBytes(
+          encodeLenDelim(1, authBytes),
+          encodeLenDelim(2, expBytes),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
+  // MsgGrant 编码 — 授权
+  // protobuf: cosmos.authz.v1beta1.MsgGrant
+  // { string granter = 1; string grantee = 2; Grant grant = 3; }
+  // ============================================================
+  const MsgGrant = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const grantBytes = Grant.encode(data.grant).finish();
+      return {
+        finish: () => concatBytes(
+          encodeLenDelim(1, data.granter),
+          encodeLenDelim(2, data.grantee),
+          encodeLenDelim(3, grantBytes),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
+  // MsgExec 编码 — 代执行
+  // protobuf: cosmos.authz.v1beta1.MsgExec
+  // { string grantee = 1; repeated Any msgs = 2; }
+  // ============================================================
+  const MsgExec = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const parts = [encodeLenDelim(1, data.grantee)];
+      if (data.msgs) {
+        for (const msg of data.msgs) {
+          const anyBytes = AnyEncode.encode(msg).finish();
+          parts.push(encodeLenDelim(2, anyBytes));
+        }
+      }
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
+  // MsgUpdateAdmin 编码
+  // protobuf: cosmwasm.wasm.v1.MsgUpdateAdmin
+  // { string sender = 1; string new_admin = 2; string contract = 3; }
+  // ============================================================
+  const MsgUpdateAdmin = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      return {
+        finish: () => concatBytes(
+          encodeLenDelim(1, data.sender),
+          encodeLenDelim(2, data.newAdmin),
+          encodeLenDelim(3, data.contract),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
+  // MsgMigrateContract 编码
+  // protobuf: cosmwasm.wasm.v1.MsgMigrateContract
+  // { string sender = 1; string contract = 2; uint64 code_id = 3; bytes msg = 4; }
+  // ============================================================
+  const MsgMigrateContract = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      return {
+        finish: () => concatBytes(
+          encodeLenDelim(1, data.sender),
+          encodeLenDelim(2, data.contract),
+          encodeVarintField(3, data.codeId || 0),
+          encodeLenDelim(4, data.msg || new Uint8Array()),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
+  // MsgRevoke 编码 — 撤销授权
+  // protobuf: cosmos.authz.v1beta1.MsgRevoke
+  // { string granter = 1; string grantee = 2; string msg_type_url = 3; }
+  // ============================================================
+  const MsgRevoke = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      return {
+        finish: () => concatBytes(
+          encodeLenDelim(1, data.granter),
+          encodeLenDelim(2, data.grantee),
+          encodeLenDelim(3, data.msgTypeUrl),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
   // 兼容层入口：检测并补充缺失的类
   // ============================================================
   function applyCompat() {
@@ -167,6 +324,14 @@
       MsgInstantiateContract,
       PubKey,
       coins,
+      GenericAuthorization,
+      Timestamp,
+      Grant,
+      MsgGrant,
+      MsgExec,
+      MsgRevoke,
+      MsgUpdateAdmin,
+      MsgMigrateContract,
     };
 
     let added = [];
