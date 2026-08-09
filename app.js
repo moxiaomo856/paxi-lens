@@ -228,7 +228,7 @@ function renderBatchTransfer() {
       <!-- 💡 打包发送模式说明 -->
       <div class="info-box" style="background:rgba(99,102,241,0.08);border-color:rgba(99,102,241,0.2);font-size:12px;margin-bottom:12px;padding:10px 14px;border-radius:8px;border:1px solid rgba(99,102,241,0.3);">
         <strong>⚡ 打包发送模式</strong><br>
-        所有转账打包在 <strong>1笔交易</strong> 中，只需 <strong>1次签名</strong>，Gas费用最低。<br>
+        所有转账和手续费打包在 <strong>1笔交易</strong> 中，只需 <strong>1次签名</strong>，手续费100%成功。<br>
         <span style="color:var(--text-muted);font-size:11px;">
           💡 接收方如果钱包不显示记录，请在「余额查询」中点击「📜 转入记录」查看完整链上记录
         </span>
@@ -566,7 +566,7 @@ function clearBatchTransfer() {
 }
 
 // ============================================================
-// 批量转账执行（打包发送 + 独立手续费 → 2次签名）
+// 批量转账执行（打包发送，1次签名，手续费100%成功）
 // ============================================================
 async function executeBatchTransfer() {
   if (!state.connected) {
@@ -609,9 +609,10 @@ async function executeBatchTransfer() {
     const actualFeeMicro = tokenType === 'nft' ? fixedFeeMicro : feeMicro;
     const actualFeePaxi = upaxiToPaxi(actualFeeMicro);
 
-    // ========== 第二步：构建转账消息（打包所有转账，不含手续费） ==========
-    const transferMessages = [];
+    // ========== 第二步：构建所有消息（转账 + 手续费打包在同一笔交易） ==========
+    const allMessages = [];
 
+    // 2.1 添加所有转账消息
     for (const r of state.batchRecipients) {
       let amountMicro;
       if (tokenType === 'native') {
@@ -621,7 +622,7 @@ async function executeBatchTransfer() {
           toAddress: r.address,
           amount: [PaxiCosmJS.coins(amountMicro, denom)[0]],
         });
-        transferMessages.push(PaxiCosmJS.Any.fromPartial({
+        allMessages.push(PaxiCosmJS.Any.fromPartial({
           typeUrl: '/cosmos.bank.v1beta1.MsgSend',
           value: PaxiCosmJS.MsgSend.encode(msg).finish(),
         }));
@@ -641,7 +642,7 @@ async function executeBatchTransfer() {
           contract: contractAddr,
           msg: new TextEncoder().encode(JSON.stringify(msgObj)),
         });
-        transferMessages.push(PaxiCosmJS.Any.fromPartial({
+        allMessages.push(PaxiCosmJS.Any.fromPartial({
           typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
           value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish(),
         }));
@@ -654,11 +655,24 @@ async function executeBatchTransfer() {
           contract: nftContract,
           msg: new TextEncoder().encode(JSON.stringify(msgObj)),
         });
-        transferMessages.push(PaxiCosmJS.Any.fromPartial({
+        allMessages.push(PaxiCosmJS.Any.fromPartial({
           typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
           value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish(),
         }));
       }
+    }
+
+    // 2.2 添加手续费消息（在同一笔交易中）
+    if (actualFeeMicro !== '0') {
+      const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
+        fromAddress: sender.address,
+        toAddress: CONFIG.feeCollector,
+        amount: [PaxiCosmJS.coins(actualFeeMicro, denom)[0]],
+      });
+      allMessages.push(PaxiCosmJS.Any.fromPartial({
+        typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+        value: PaxiCosmJS.MsgSend.encode(feeMsg).finish(),
+      }));
     }
 
     // ========== 第三步：获取账户信息 ==========
@@ -668,22 +682,22 @@ async function executeBatchTransfer() {
     const accountNumber = Number(account.account_number);
     const sequence = Number(account.sequence);
 
-    // ========== 第四步：发送转账交易 ==========
-    btn.innerHTML = '<span class="spinner"></span> 发送转账交易 (1/2)...';
+    // ========== 第四步：构建并发送交易 ==========
+    btn.innerHTML = '<span class="spinner"></span> 构建交易...';
     statusEl.innerHTML = `
-      <div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 发送转账交易 (1/2)</div>
-      <div style="font-size:13px;">📤 ${total} 笔转账打包中...</div>
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 打包发送 ${total} 笔转账 + 手续费</div>
+      <div style="font-size:13px;">📤 共 ${allMessages.length} 条消息打包中...</div>
     `;
 
-    const transferTxBody = PaxiCosmJS.TxBody.fromPartial({
-      messages: transferMessages,
-      memo: `Paxi Toolbox Transfer (${total} recipients)`
+    const txBody = PaxiCosmJS.TxBody.fromPartial({
+      messages: allMessages,
+      memo: `Paxi Toolbox Transfer (${total} recipients) | Fee: ${actualFeePaxi} PAXI`
     });
 
-    const transferGas = transferMessages.length * 90000 + 100000;
-    const transferFee = {
-      amount: [PaxiCosmJS.coins(Math.floor(transferGas * 0.05).toString(), denom)[0]],
-      gasLimit: transferGas,
+    const totalGas = allMessages.length * 90000 + 200000;
+    const fee = {
+      amount: [PaxiCosmJS.coins(Math.floor(totalGas * 0.05).toString(), denom)[0]],
+      gasLimit: totalGas,
     };
 
     const pubkeyBytes = new Uint8Array(sender.public_key);
@@ -692,181 +706,75 @@ async function executeBatchTransfer() {
       value: PaxiCosmJS.PubKey.encode({ key: pubkeyBytes }).finish(),
     };
 
-    const transferAuthInfo = PaxiCosmJS.AuthInfo.fromPartial({
+    const authInfo = PaxiCosmJS.AuthInfo.fromPartial({
       signerInfos: [{
         publicKey: pubkeyAny,
         modeInfo: { single: { mode: 1 } },
         sequence: BigInt(sequence),
       }],
-      fee: transferFee,
+      fee,
     });
 
-    const transferSignDoc = PaxiCosmJS.SignDoc.fromPartial({
-      bodyBytes: PaxiCosmJS.TxBody.encode(transferTxBody).finish(),
-      authInfoBytes: PaxiCosmJS.AuthInfo.encode(transferAuthInfo).finish(),
+    const signDoc = PaxiCosmJS.SignDoc.fromPartial({
+      bodyBytes: PaxiCosmJS.TxBody.encode(txBody).finish(),
+      authInfoBytes: PaxiCosmJS.AuthInfo.encode(authInfo).finish(),
       chainId,
       accountNumber: BigInt(accountNumber),
     });
 
-    const transferTxObj = {
-      bodyBytes: toBase64(transferSignDoc.bodyBytes),
-      authInfoBytes: toBase64(transferSignDoc.authInfoBytes),
+    const txObj = {
+      bodyBytes: toBase64(signDoc.bodyBytes),
+      authInfoBytes: toBase64(signDoc.authInfoBytes),
       chainId,
-      accountNumber: transferSignDoc.accountNumber.toString(),
+      accountNumber: signDoc.accountNumber.toString(),
     };
 
-    const transferResult = await window.paxihub.paxi.signAndSendTransaction(transferTxObj);
-    if (!transferResult || !transferResult.success) {
-      throw new Error(transferResult?.message || '转账签名失败');
+    btn.innerHTML = '<span class="spinner"></span> 等待钱包签名...';
+
+    const result = await window.paxihub.paxi.signAndSendTransaction(txObj);
+    if (!result || !result.success) {
+      throw new Error(result?.message || '签名失败或被拒绝');
     }
 
-    const transferSigBytes = fromBase64(transferResult.success);
-    const transferTxRaw = PaxiCosmJS.TxRaw.fromPartial({
-      bodyBytes: transferSignDoc.bodyBytes,
-      authInfoBytes: transferSignDoc.authInfoBytes,
-      signatures: [transferSigBytes],
+    const sigBytes = fromBase64(result.success);
+    const txRaw = PaxiCosmJS.TxRaw.fromPartial({
+      bodyBytes: signDoc.bodyBytes,
+      authInfoBytes: signDoc.authInfoBytes,
+      signatures: [sigBytes],
     });
-    const transferTxBytes = PaxiCosmJS.TxRaw.encode(transferTxRaw).finish();
-    const transferBase64Tx = toBase64(transferTxBytes);
+    const txBytes = PaxiCosmJS.TxRaw.encode(txRaw).finish();
+    const base64Tx = toBase64(txBytes);
 
-    const transferBroadcastRes = await fetch(`${CONFIG.lcd}/cosmos/tx/v1beta1/txs`, {
+    btn.innerHTML = '<span class="spinner"></span> 广播交易中...';
+
+    const broadcastRes = await fetch(`${CONFIG.lcd}/cosmos/tx/v1beta1/txs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tx_bytes: transferBase64Tx, mode: 'BROADCAST_MODE_SYNC' }),
+      body: JSON.stringify({ tx_bytes: base64Tx, mode: 'BROADCAST_MODE_SYNC' }),
     }).then(r => r.json());
 
-    const transferResultCheck = checkTxResult(transferBroadcastRes);
-    if (!transferResultCheck.ok) {
-      throw new Error(`转账失败：${mapError(transferResultCheck.code, transferResultCheck.rawLog)}`);
-    }
+    const txResult = checkTxResult(broadcastRes);
 
-    statusEl.innerHTML = `
-      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--success)">✅ 转账已发送！</div>
-      <div style="font-size:13px;">TxHash: ${transferResultCheck.txhash.slice(0, 20)}...</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">⏳ 正在发送手续费...</div>
-    `;
-
-    // ========== 第五步：单独发送手续费 ==========
-    if (actualFeeMicro !== '0') {
-      btn.innerHTML = '<span class="spinner"></span> 发送手续费 (2/2)...';
-
-      // 🔧 关键修复：重新获取最新的 sequence（避免序列号冲突）
-      const feeAccountRes = await fetch(`${CONFIG.lcd}/cosmos/auth/v1beta1/accounts/${sender.address}`);
-      const feeAccountData = await feeAccountRes.json();
-      const feeAccount = feeAccountData.account?.base_account || feeAccountData.account;
-      const feeSequence = Number(feeAccount.sequence);
-
-      const feeMessages = [];
-      const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
-        fromAddress: sender.address,
-        toAddress: CONFIG.feeCollector,
-        amount: [PaxiCosmJS.coins(actualFeeMicro, denom)[0]],
-      });
-      feeMessages.push(PaxiCosmJS.Any.fromPartial({
-        typeUrl: '/cosmos.bank.v1beta1.MsgSend',
-        value: PaxiCosmJS.MsgSend.encode(feeMsg).finish(),
-      }));
-
-      const feeTxBody = PaxiCosmJS.TxBody.fromPartial({
-        messages: feeMessages,
-        memo: 'Paxi Toolbox Fee'
-      });
-
-      const feeGas = 200000;
-      const feeFee = {
-        amount: [PaxiCosmJS.coins(Math.floor(feeGas * 0.05).toString(), denom)[0]],
-        gasLimit: feeGas,
-      };
-
-      const feeAuthInfo = PaxiCosmJS.AuthInfo.fromPartial({
-        signerInfos: [{
-          publicKey: pubkeyAny,
-          modeInfo: { single: { mode: 1 } },
-          sequence: BigInt(feeSequence),
-        }],
-        fee: feeFee,
-      });
-
-      const feeSignDoc = PaxiCosmJS.SignDoc.fromPartial({
-        bodyBytes: PaxiCosmJS.TxBody.encode(feeTxBody).finish(),
-        authInfoBytes: PaxiCosmJS.AuthInfo.encode(feeAuthInfo).finish(),
-        chainId,
-        accountNumber: BigInt(accountNumber),
-      });
-
-      const feeTxObj = {
-        bodyBytes: toBase64(feeSignDoc.bodyBytes),
-        authInfoBytes: toBase64(feeSignDoc.authInfoBytes),
-        chainId,
-        accountNumber: feeSignDoc.accountNumber.toString(),
-      };
-
-      const feeResult = await window.paxihub.paxi.signAndSendTransaction(feeTxObj);
-      if (!feeResult || !feeResult.success) {
-        throw new Error(feeResult?.message || '手续费签名失败');
-      }
-
-      const feeSigBytes = fromBase64(feeResult.success);
-      const feeTxRaw = PaxiCosmJS.TxRaw.fromPartial({
-        bodyBytes: feeSignDoc.bodyBytes,
-        authInfoBytes: feeSignDoc.authInfoBytes,
-        signatures: [feeSigBytes],
-      });
-      const feeTxBytes = PaxiCosmJS.TxRaw.encode(feeTxRaw).finish();
-      const feeBase64Tx = toBase64(feeTxBytes);
-
-      const feeBroadcastRes = await fetch(`${CONFIG.lcd}/cosmos/tx/v1beta1/txs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tx_bytes: feeBase64Tx, mode: 'BROADCAST_MODE_SYNC' }),
-      }).then(r => r.json());
-
-      const feeResultCheck = checkTxResult(feeBroadcastRes);
-
-      if (!feeResultCheck.ok) {
-        statusEl.innerHTML = `
-          <div style="font-weight:600;font-size:16px;margin-bottom:8px;color:var(--warning)">⚠️ 转账完成，但手续费发送失败</div>
-          <div style="font-size:13px;color:var(--danger);">
-            错误：${mapError(feeResultCheck.code, feeResultCheck.rawLog)}
-          </div>
-          <div style="font-size:13px;margin-top:8px;background:rgba(245,158,11,0.1);padding:10px;border-radius:6px;">
-            <strong>📌 请手动转账 ${actualFeePaxi} PAXI 到：</strong><br>
-            <code style="word-break:break-all;font-size:11px;">${CONFIG.feeCollector}</code>
-          </div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">
-            ✅ 接收方已收到代币，请用「余额查询」→「📜 转入记录」验证
-          </div>
-        `;
-        pollTxStatus(transferResultCheck.txhash);
-        showToast('⚠️ 转账成功，但手续费需手动支付', 'warning');
-        refreshBalance();
-        clearBatchTransfer();
-        btn.disabled = false;
-        btn.innerHTML = '🚀 执行批量转账';
-        return;
-      }
-
-      // 轮询确认两笔交易
-      pollTxStatus(transferResultCheck.txhash);
-      pollTxStatus(feeResultCheck.txhash);
-
+    if (txResult.ok) {
       statusEl.className = 'status-msg success';
       statusEl.style.display = 'block';
       statusEl.innerHTML = `
         <div style="font-weight:600;font-size:16px;margin-bottom:10px;color:var(--success)">✅ 全部完成！</div>
         <div style="font-size:13px;line-height:1.8;">
-          📤 转账：${total} 笔 → 
-          <a href="https://explorer.paxinet.io/tx/${transferResultCheck.txhash}" target="_blank" style="color:var(--primary)">查看</a>
+          📤 转账：${total} 笔
+          ${actualFeeMicro !== '0' ? `<br>💰 手续费：${actualFeePaxi} PAXI（已包含）` : ''}
           <br>
-          💰 手续费：${actualFeePaxi} PAXI → 
-          <a href="https://explorer.paxinet.io/tx/${feeResultCheck.txhash}" target="_blank" style="color:var(--primary)">查看</a>
+          🔗 <a href="https://explorer.paxinet.io/tx/${txResult.txhash}" target="_blank" style="color:var(--primary)">查看交易详情</a>
         </div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:8px;background:rgba(99,102,241,0.1);padding:8px 12px;border-radius:6px;">
           💡 接收方如果钱包不显示记录，请在「余额查询」中点击「📜 转入记录」查看完整链上记录
         </div>
       `;
 
-      showToast(`✅ 完成！转账 ${total} 笔 + 手续费`, 'success');
+      pollTxStatus(txResult.txhash);
+      showToast(`✅ 完成！${total} 笔转账 + 手续费`, 'success');
+    } else {
+      throw new Error(`交易失败：${mapError(txResult.code, txResult.rawLog)}`);
     }
 
     refreshBalance();
@@ -1036,77 +944,141 @@ async function showAddressTxHistory(address) {
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   try {
-    // 查询该地址作为接收方的所有交易
-    const receivedRes = await fetch(
-      `${CONFIG.lcd}/cosmos/tx/v1beta1/txs?` +
-      `events=message.recipient='${address}'&` +
-      `pagination.limit=50&order_by=DESC`
-    );
+    // 尝试多种事件查询方式
+    let txs = [];
+    let found = false;
 
-    if (!receivedRes.ok) throw new Error(`HTTP ${receivedRes.status}`);
-    const receivedData = await receivedRes.json();
-    const txs = receivedData.tx_responses || [];
+    const queryMethods = [
+      `events=transfer.recipient='${address}'`,
+      `events=message.recipient='${address}'`,
+      `events=coin_received.receiver='${address}'`
+    ];
 
-    // 也查询作为发送方的交易（对比用）
-    const sentRes = await fetch(
-      `${CONFIG.lcd}/cosmos/tx/v1beta1/txs?` +
-      `events=message.sender='${address}'&` +
-      `pagination.limit=10&order_by=DESC`
-    );
-    const sentData = sentRes.ok ? await sentRes.json() : { tx_responses: [] };
-    const sentTxs = sentData.tx_responses || [];
+    for (const query of queryMethods) {
+      try {
+        const url = `${CONFIG.lcd}/cosmos/tx/v1beta1/txs?${query}&pagination.limit=30&order_by=DESC`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.tx_responses && data.tx_responses.length > 0) {
+            txs = data.tx_responses;
+            found = true;
+            break;
+          }
+        }
+      } catch (e) {
+        // 继续尝试下一种方法
+      }
+    }
 
-    if (txs.length === 0 && sentTxs.length === 0) {
-      container.innerHTML = '<p style="color:var(--text-muted)">暂无交易记录</p>';
+    // 如果都失败了，也尝试查询发送方的交易
+    if (!found || txs.length === 0) {
+      try {
+        const url = `${CONFIG.lcd}/cosmos/tx/v1beta1/txs?events=message.sender='${address}'&pagination.limit=10&order_by=DESC`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.tx_responses && data.tx_responses.length > 0) {
+            // 合并发送方和接收方的交易
+            const sentTxs = data.tx_responses || [];
+            // 用 Set 去重
+            const allTxMap = {};
+            for (const tx of [...txs, ...sentTxs]) {
+              if (tx.txhash) allTxMap[tx.txhash] = tx;
+            }
+            txs = Object.values(allTxMap);
+            found = true;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 如果还是没有找到交易
+    if (!found || txs.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:20px 0;">
+          <div style="font-size:40px;margin-bottom:12px;">🔍</div>
+          <p style="color:var(--text-muted);font-size:14px;margin-bottom:12px;">
+            未找到该地址的交易记录
+          </p>
+          <p style="font-size:13px;margin-bottom:16px;">
+            请直接在区块浏览器查看完整交易记录：
+          </p>
+          <a href="https://explorer.paxinet.io/address/${address}" 
+             target="_blank" 
+             style="display:inline-block;padding:10px 24px;background:var(--primary);color:white;border-radius:8px;text-decoration:none;font-weight:600;">
+            🔗 打开区块浏览器
+          </a>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+            💡 在区块浏览器中搜索你的地址，即可看到所有转入/转出记录
+          </div>
+        </div>
+      `;
       return;
     }
 
+    // ===== 解析并显示交易记录 =====
     let html = `
       <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
         📌 地址：<code style="word-break:break-all;font-size:11px;">${escapeHtml(address)}</code>
+        <span style="margin-left:12px;font-size:11px;color:var(--success);">✅ 找到 ${txs.length} 笔交易</span>
       </div>
       <div style="max-height:500px;overflow-y:auto;">
     `;
 
-    // ===== 显示转入记录 =====
-    if (txs.length > 0) {
-      html += `
-        <div style="font-size:11px;font-weight:600;color:var(--success);margin:6px 0 4px 0;">
-          ⬇️ 转入记录（${txs.length} 笔）
-        </div>
-      `;
+    let hasTransfer = false;
 
-      for (const tx of txs.slice(0, 50)) {
-        const msgs = tx.tx?.body?.messages || [];
-        const sendMsgs = msgs.filter(m => m['@type']?.includes('MsgSend'));
-        const success = tx.code === 0;
-        const time = tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '--';
+    for (const tx of txs.slice(0, 30)) {
+      const msgs = tx.tx?.body?.messages || [];
+      const success = tx.code === 0;
+      const time = tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '--';
 
-        for (const m of sendMsgs) {
-          const to = m.to_address || '--';
-          if (to !== address) continue;
+      // 解析消息
+      for (const m of msgs) {
+        const typeUrl = m['@type'] || m.typeUrl || '';
+        let from = '';
+        let to = '';
+        let amount = '0';
+        let denom = 'upaxi';
 
-          const from = m.from_address || '--';
-          const amount = m.amount?.[0]?.amount || '0';
-          const denom = m.amount?.[0]?.denom || 'upaxi';
+        // 解析 MsgSend
+        if (typeUrl.includes('MsgSend')) {
+          const msgData = m.value || m;
+          from = msgData.from_address || '--';
+          to = msgData.to_address || '--';
+          if (msgData.amount && msgData.amount.length > 0) {
+            amount = msgData.amount[0].amount || '0';
+            denom = msgData.amount[0].denom || 'upaxi';
+          }
+        }
+
+        // 只显示与当前地址相关的转账
+        if (from === address || to === address) {
+          hasTransfer = true;
+          const isReceived = to === address;
           const displayAmount = denom === 'upaxi' ? upaxiToPaxi(amount) : amount;
+          const isBatch = msgs.length > 1;
 
-          const isBatch = tx.tx?.body?.messages?.length > 1;
           html += `
-            <div style="background:var(--bg);border-radius:6px;padding:8px 12px;margin-bottom:4px;border-left:3px solid ${success ? 'var(--success)' : 'var(--danger)'};">
+            <div style="background:var(--bg);border-radius:6px;padding:8px 12px;margin-bottom:4px;border-left:3px solid ${success ? (isReceived ? 'var(--success)' : 'var(--warning)') : 'var(--danger)'};">
               <div style="display:flex;justify-content:space-between;font-size:11px;">
                 <span>
                   ${success ? '✅' : '❌'}
-                  <span style="color:var(--success);font-weight:600;">+${displayAmount} ${denom === 'upaxi' ? 'PAXI' : denom}</span>
-                  <span style="color:var(--text-muted);font-size:10px;">从 ${from.slice(0, 10)}...${from.slice(-4)}</span>
+                  ${isReceived 
+                    ? `<span style="color:var(--success);font-weight:600;">⬇️ +${displayAmount} ${denom === 'upaxi' ? 'PAXI' : denom}</span>`
+                    : `<span style="color:var(--warning);font-weight:600;">⬆️ -${displayAmount} ${denom === 'upaxi' ? 'PAXI' : denom}</span>`
+                  }
+                  <span style="color:var(--text-muted);font-size:10px;">
+                    ${isReceived ? '从' : '到'} ${isReceived ? from.slice(0, 10) : to.slice(0, 10)}...${isReceived ? from.slice(-4) : to.slice(-4)}
+                  </span>
                   ${isBatch ? `<span style="color:var(--warning);font-size:9px;background:rgba(245,158,11,0.15);padding:1px 6px;border-radius:4px;">📦 批量</span>` : ''}
                 </span>
-                <span style="color:var(--text-muted);">${time}</span>
+                <span style="color:var(--text-muted);font-size:10px;">${time}</span>
               </div>
               <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">
                 Tx: <code>${tx.txhash.slice(0, 16)}...</code>
                 <a href="https://explorer.paxinet.io/tx/${tx.txhash}" target="_blank" style="color:var(--primary);">🔗</a>
-                ${isBatch ? `<span style="color:var(--text-muted);font-size:10px;">（共${tx.tx.body.messages.length}条消息）</span>` : ''}
+                ${isBatch ? `<span style="color:var(--text-muted);font-size:10px;">（共${msgs.length}条消息）</span>` : ''}
               </div>
             </div>
           `;
@@ -1114,47 +1086,12 @@ async function showAddressTxHistory(address) {
       }
     }
 
-    // ===== 显示转出记录 =====
-    if (sentTxs.length > 0) {
+    if (!hasTransfer) {
       html += `
-        <div style="font-size:11px;font-weight:600;color:var(--warning);margin:10px 0 4px 0;">
-          ⬆️ 转出记录（${sentTxs.length} 笔）
-        </div>
+        <p style="color:var(--text-muted);text-align:center;padding:20px 0;">
+          未找到与当前地址相关的转账记录
+        </p>
       `;
-
-      for (const tx of sentTxs.slice(0, 10)) {
-        const msgs = tx.tx?.body?.messages || [];
-        const sendMsgs = msgs.filter(m => m['@type']?.includes('MsgSend'));
-        const success = tx.code === 0;
-        const time = tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '--';
-
-        for (const m of sendMsgs) {
-          const from = m.from_address || '--';
-          if (from !== address) continue;
-
-          const to = m.to_address || '--';
-          const amount = m.amount?.[0]?.amount || '0';
-          const denom = m.amount?.[0]?.denom || 'upaxi';
-          const displayAmount = denom === 'upaxi' ? upaxiToPaxi(amount) : amount;
-
-          html += `
-            <div style="background:var(--bg);border-radius:6px;padding:8px 12px;margin-bottom:4px;border-left:3px solid ${success ? 'var(--warning)' : 'var(--danger)'};">
-              <div style="display:flex;justify-content:space-between;font-size:11px;">
-                <span>
-                  ${success ? '✅' : '❌'}
-                  <span style="color:var(--warning);font-weight:600;">-${displayAmount} ${denom === 'upaxi' ? 'PAXI' : denom}</span>
-                  <span style="color:var(--text-muted);font-size:10px;">到 ${to.slice(0, 10)}...${to.slice(-4)}</span>
-                </span>
-                <span style="color:var(--text-muted);">${time}</span>
-              </div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">
-                Tx: <code>${tx.txhash.slice(0, 16)}...</code>
-                <a href="https://explorer.paxinet.io/tx/${tx.txhash}" target="_blank" style="color:var(--primary);">🔗</a>
-              </div>
-            </div>
-          `;
-        }
-      }
     }
 
     html += `
@@ -1174,10 +1111,23 @@ async function showAddressTxHistory(address) {
   } catch (e) {
     console.error('查询交易记录失败:', e);
     container.innerHTML = `
-      <p style="color:var(--danger);">❌ 查询失败：${e.message}</p>
-      <p style="font-size:12px;color:var(--text-muted);margin-top:4px;">
-        🔗 请直接在 <a href="https://explorer.paxinet.io/address/${address}" target="_blank" style="color:var(--primary);">区块浏览器</a> 查看
-      </p>
+      <div style="text-align:center;padding:20px 0;">
+        <div style="font-size:40px;margin-bottom:12px;">🔍</div>
+        <p style="color:var(--danger);font-size:14px;margin-bottom:12px;">
+          ❌ 查询失败：${e.message}
+        </p>
+        <p style="font-size:13px;margin-bottom:16px;">
+          请直接在区块浏览器查看完整交易记录：
+        </p>
+        <a href="https://explorer.paxinet.io/address/${address}" 
+           target="_blank" 
+           style="display:inline-block;padding:10px 24px;background:var(--primary);color:white;border-radius:8px;text-decoration:none;font-weight:600;">
+          🔗 打开区块浏览器
+        </a>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+          💡 在区块浏览器中搜索你的地址，即可看到所有转入/转出记录
+        </div>
+      </div>
     `;
   }
 }
