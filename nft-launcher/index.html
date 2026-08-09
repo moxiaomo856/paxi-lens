@@ -659,17 +659,38 @@ async function deployNFTContract() {
 
     btn.innerHTML = '<span class="spinner"></span> 构建合约初始化消息...';
 
-    // 构建 PRC-721 合约初始化消息（根据官方 PRC-721 标准修改）
-    // 图片使用 IPFS/Arweave URI（不再存入 Base64 到链上，避免 Gas 爆炸）
+    // 构建 PRC-721 合约初始化消息
+    // ⚠️ 严格遵守官方 PRC-721 标准 — InstantiateMsg 只接受 3 个字段：name, symbol, minter
+    // 多余字段会导致 WASM 越界访问（OutOfBoundsMemoryAccess, code 11）
+    // 集合级别的扩展元数据（描述/图片/版税/最大供应等）存到链下 localStorage
     const imageUri = document.getElementById('nftImageUri')?.value.trim() || '';
     coverImageUri = imageUri;
 
-    // 官方标准 PRC-721 要求的初始化消息只有这 3 个字段！
     const initMsg = {
       name: name,
       symbol: symbol,
-      minter: walletState.address
+      minter: walletState.address,
     };
+
+    // 链下集合配置（marketplace 展示用）
+    const collectionConfig = {
+      name, symbol, description,
+      image: imageUri,
+      externalUrl: externalUrl || '',
+      royalty: royalty,                      // 百分比数字，如 7.5
+      royaltyShare: (royalty / 100).toString(), // 链下 Decimal 字符串，如 "0.075"
+      mintPrice: mintPrice,                  // PAXI
+      maxSupply: maxSupply,
+      maxPerWallet: maxPerWallet,
+      attributes,
+      deployedBy: walletState.address,
+      deployedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem(`paxi_collection_${name}_${symbol}`, JSON.stringify(collectionConfig));
+    } catch (e) {
+      console.warn('localStorage 写入失败:', e);
+    }
 
     // 构建消息数组
     const messages = [];
@@ -983,8 +1004,18 @@ async function executeBatchMint() {
       if (count > 50) {
         showToast('⚠️ 逐个铸造模式最多 50 枚/批，将铸造 50 枚。如需更多请分批操作。', 'error');
       }
+      // 官方 PRC-721 mint 格式：必须包含 token_id + owner，可选 token_uri
+      // 缺 token_id/owner 会导致合约 assert 失败
+      const tokenUri = coverImageUri || ''; // 单 NFT 的 metadata URI（IPFS/Arweave）
       for (let i = 0; i < maxIter; i++) {
-        const mintMsg = { mint: { recipient: recipient } };
+        const tokenId = String(Date.now()) + '-' + String(i); // 唯一 token_id
+        const mintMsg = {
+          mint: {
+            token_id: tokenId,
+            owner: recipient,
+            token_uri: tokenUri || null,
+          }
+        };
         const mintFunds = [PaxiCosmJS.coins(mintPriceMicro, CONFIG.denom)[0]];
         const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
           sender: walletState.address,
