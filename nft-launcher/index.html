@@ -659,30 +659,16 @@ async function deployNFTContract() {
 
     btn.innerHTML = '<span class="spinner"></span> 构建合约初始化消息...';
 
-    // 构建 PRC-721 合约初始化消息
+    // 构建 PRC-721 合约初始化消息（根据官方 PRC-721 标准修改）
     // 图片使用 IPFS/Arweave URI（不再存入 Base64 到链上，避免 Gas 爆炸）
     const imageUri = document.getElementById('nftImageUri')?.value.trim() || '';
     coverImageUri = imageUri;
 
+    // 官方标准 PRC-721 要求的初始化消息只有这 3 个字段！
     const initMsg = {
       name: name,
       symbol: symbol,
-      minter: walletState.address,
-      max_supply: maxSupply,
-      mint_price: Math.floor(mintPrice * 1e6).toString(),
-      max_per_wallet: maxPerWallet,
-      collection_info: {
-        name: name,
-        symbol: symbol,
-        description: description,
-        image: imageUri,  // 使用 IPFS/Arweave URI 替代 Base64
-        external_link: externalUrl || '',
-        royalty_info: {
-          payment_address: walletState.address,
-          share: (royalty / 100).toString(),
-        },
-      },
-      attributes: attributes,
+      minter: walletState.address
     };
 
     // 构建消息数组
