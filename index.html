@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paxi 工具箱 - 批量转账 · 余额查询 · NFT发射 · 更多</title>
+  <meta name="description" content="Paxi Network 生态工具集：批量转账、余额查询、交易追踪、Gas计算、地址转换、验证节点对比、PRC-721 NFT发射平台">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236366f1'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='white'>P</text></svg>">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --bg-hover: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #818cf8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #334155;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    /* Header */
+    .header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 36px; height: 36px;
+      background: var(--primary);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 18px; color: white;
+    }
+    .header-title { font-size: 18px; font-weight: 700; }
+    .header-badge {
+      font-size: 11px;
+      background: var(--primary);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 100px;
+      font-weight: 600;
+    }
+    /* Wallet */
+    .wallet-area { display: flex; align-items: center; gap: 12px; }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { background: var(--bg-hover); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .wallet-address {
+      font-size: 13px;
+      color: var(--text-muted);
+      background: var(--bg);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .wallet-balance { font-size: 13px; font-weight: 600; color: var(--success); }
+    /* Navigation */
+    .nav {
+      display: flex;
+      gap: 4px;
+      padding: 16px 24px 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav-item {
+      padding: 10px 18px;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+      border-bottom: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .nav-item:hover { color: var(--text); background: var(--bg-card); }
+    .nav-item.active {
+      color: var(--primary);
+      background: var(--bg-card);
+      border-color: var(--border);
+    }
+    .nav-icon { font-size: 16px; }
+    /* Main */
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .tool-panel { display: none; }
+    .tool-panel.active { display: block; }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    /* Form */
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    textarea, input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: monospace;
+      transition: border-color 0.2s;
+    }
+    textarea:focus, input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    textarea { min-height: 160px; resize: vertical; }
+    select { cursor: pointer; }
+    /* File upload area */
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--text-muted);
+    }
+    .upload-area:hover { border-color: var(--primary); color: var(--text); }
+    .upload-area.dragover { border-color: var(--primary); background: rgba(99,102,241,0.1); }
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    tr:hover td { background: rgba(99,102,241,0.05); }
+    /* Status */
+    .status-msg {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-top: 12px;
+      display: none;
+    }
+    .status-msg.success { background: rgba(34,197,94,0.15); color: var(--success); display: block; }
+    .status-msg.error { background: rgba(239,68,68,0.15); color: var(--danger); display: block; }
+    .status-msg.info { background: rgba(99,102,241,0.15); color: var(--primary); display: block; }
+    .status-msg.warning { background: rgba(245,158,11,0.15); color: var(--warning); display: block; }
+    /* Stats row */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .stat-card {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+    }
+    .stat-value { font-size: 22px; font-weight: 800; color: var(--primary); }
+    .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--primary); background: rgba(99,102,241,0.15); border-color: var(--primary); }
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 200;
+      animation: slideUp 0.3s ease;
+      box-shadow: var(--shadow);
+    }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--danger); }
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header { padding: 12px 16px; }
+      .header-title { font-size: 15px; }
+      .nav { padding: 8px 8px 0; gap: 2px; }
+      .nav-item { padding: 8px 12px; font-size: 12px; }
+      .main { padding: 16px; }
+      .card { padding: 16px; }
+    }
+    /* Tool description */
+    .tool-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    /* Monospace highlight */
+    code {
+      background: var(--bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--primary);
+    }
+    /* Step indicator */
+    .steps {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+    .step {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: var(--text-muted);
+    }
+    .step.active { border-color: var(--primary); color: var(--primary); background: rgba(99,102,241,0.15); }
+    .step.done { border-color: var(--success); color: var(--success); background: rgba(34,197,94,0.15); }
+    .step-line { flex: 1; height: 2px; background: var(--border); max-width: 40px; }
+    .step-line.done { background: var(--success); }
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 32px 24px;
+      color: var(--text-muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      margin-top: 48px;
+    }
+    .footer a { color: var(--primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">P</div>
+      <div>
+        <div class="header-title">Paxi 工具箱</div>
+        <div style="font-size:11px;color:var(--text-muted)">Paxi Network 生态工具集</div>
+      </div>
+      <span class="header-badge">Beta</span>
+    </div>
+    <div class="wallet-area">
+      <span class="wallet-balance" id="walletBalance" style="display:none"></span>
+      <span class="wallet-address" id="walletAddress" style="display:none"></span>
+      <button class="btn btn-primary" id="btnConnect" onclick="connectWallet()">
+        🔌 连接钱包
+      </button>
+      <button class="btn btn-outline btn-sm" id="btnDisconnect" style="display:none" onclick="disconnectWallet()">
+        断开
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="nav" id="nav">
+    <div class="nav-item active" data-tool="batch-transfer">
+      <span class="nav-icon">📤</span> 批量转账
+    </div>
+    <div class="nav-item" data-tool="balance-check">
+      <span class="nav-icon">💰</span> 余额查询
+    </div>
+    <div class="nav-item" data-tool="tx-tracker">
+      <span class="nav-icon">🔍</span> 交易追踪
+    </div>
+    <div class="nav-item" data-tool="gas-calc">
+      <span class="nav-icon">⛽</span> Gas计算
+    </div>
+    <div class="nav-item" data-tool="address-convert">
+      <span class="nav-icon">🔄</span> 地址转换
+    </div>
+    <div class="nav-item" data-tool="validator-compare">
+      <span class="nav-icon">🏦</span> 验证节点
+    </div>
+    <div class="nav-item" data-tool="token-info">
+      <span class="nav-icon">🪙</span> 代币查询
+    </div>
+    <a href="nft-launcher/index.html" style="text-decoration:none">
+      <div class="nav-item" style="background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(99,102,241,0.1));border-color:rgba(168,85,247,0.3)">
+        <span class="nav-icon">🎨</span> NFT发射
+      </div>
+    </a>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main" id="mainContent">
+    <!-- Content loaded dynamically via JS -->
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>Paxi 工具箱 · 为 Paxi Network 生态打造 · 完全去中心化 · 无需信任</p>
+    <p style="margin-top:4px">数据来源：<a href="https://mainnet-lcd.paxinet.io" target="_blank">Paxi LCD API</a> · 钱包集成：<a href="https://paxinet.io" target="_blank">PaxiHub</a></p>
+  </footer>
+
+  <!-- Paxi CosmJS SDK -->
+  <script src="https://mainnet-api.paxinet.io/resources/js/paxi-cosmjs.umd.js"></script>
+  <!-- SDK 兼容层：补充 PaxiCosmJS 缺失的 MsgSend/MsgExecuteContract/PubKey/coins 等类 -->
+  <script src="compat.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
