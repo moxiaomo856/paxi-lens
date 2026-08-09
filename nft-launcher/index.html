@@ -353,6 +353,15 @@
       </select>
     </div>
 
+    <!-- 起始 Token ID（逐个铸造模式专用） -->
+    <div class="form-group" id="mintStartTokenGroup">
+      <label class="form-label">起始 Token ID（逐个铸造模式专用，从该数字开始递增）</label>
+      <input type="number" id="mintStartTokenId" placeholder="1" min="1" value="1">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        💡 系统将从该数字开始依次分配 Token ID：1, 2, 3, ...。请确保不会与已有 NFT 的 Token ID 冲突。
+      </div>
+    </div>
+
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">铸造数量 *</label>
@@ -361,6 +370,15 @@
       <div class="form-group">
         <label class="form-label">接收地址（留空=铸造给自己）</label>
         <input type="text" id="mintRecipient" placeholder="paxi1...（留空则铸造到当前钱包）">
+      </div>
+    </div>
+
+    <!-- Token URI 输入（逐个铸造模式专用） -->
+    <div class="form-group" id="mintTokenUriGroup">
+      <label class="form-label">Token URI（逐个铸造模式专用，每枚 NFT 的元数据地址）</label>
+      <input type="text" id="mintTokenUri" placeholder="ipfs://Qm... 或 https://arweave.net/...（留空则使用合集封面图 URI）">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        💡 留空则使用步骤2中填写的封面图 URI。每个 Token 可使用不同的 URI，用英文逗号分隔。
       </div>
     </div>
 
@@ -620,10 +638,6 @@ function processCoverFile(file) {
 }
 
 // ============================================================
-// 通用：构建 & 签名 & 广播交易 — 使用 shared.js 中的 buildSignAndBroadcast
-// ============================================================
-
-// ============================================================
 // 部署 NFT 合约
 // ============================================================
 async function deployNFTContract() {
@@ -653,33 +667,28 @@ async function deployNFTContract() {
       if (attrText) attributes = JSON.parse(attrText);
     } catch (e) {}
 
-    // 计算费用
     const mintFeeMicro = Math.floor(CONFIG.deployFee * 1e6).toString();
-    const deployGasPaxi = 0.05; // 大约的 gas 费
 
     btn.innerHTML = '<span class="spinner"></span> 构建合约初始化消息...';
 
-    // 构建 PRC-721 合约初始化消息
-    // ⚠️ 严格遵守官方 PRC-721 标准 — InstantiateMsg 只接受 3 个字段：name, symbol, minter
-    // 多余字段会导致 WASM 越界访问（OutOfBoundsMemoryAccess, code 11）
-    // 集合级别的扩展元数据（描述/图片/版税/最大供应等）存到链下 localStorage
     const imageUri = document.getElementById('nftImageUri')?.value.trim() || '';
     coverImageUri = imageUri;
 
+    // 官方标准 PRC-721 初始化消息
     const initMsg = {
       name: name,
       symbol: symbol,
       minter: walletState.address,
     };
 
-    // 链下集合配置（marketplace 展示用）
+    // 链下集合配置
     const collectionConfig = {
       name, symbol, description,
       image: imageUri,
       externalUrl: externalUrl || '',
-      royalty: royalty,                      // 百分比数字，如 7.5
-      royaltyShare: (royalty / 100).toString(), // 链下 Decimal 字符串，如 "0.075"
-      mintPrice: mintPrice,                  // PAXI
+      royalty: royalty,
+      royaltyShare: (royalty / 100).toString(),
+      mintPrice: mintPrice,
       maxSupply: maxSupply,
       maxPerWallet: maxPerWallet,
       attributes,
@@ -692,24 +701,16 @@ async function deployNFTContract() {
       console.warn('localStorage 写入失败:', e);
     }
 
-    // 构建消息数组
     const messages = [];
-
-    // 1. 合约实例化消息（需要预上传的 code ID）
-    // 这里使用 MsgInstantiateContract，需要知道 code ID
-    // code ID 可以通过查询链上已上传的 PRC-721 合约获取
-    // 我们先尝试查找链上已有的 PRC-721 code ID
     btn.innerHTML = '<span class="spinner"></span> 查找可用合约模板...';
 
     let codeId = null;
 
-    // 方法1：从 localStorage 读取之前上传的 code ID
     const savedCodeId = localStorage.getItem('paxi_prc721_code_id');
     if (savedCodeId) {
       codeId = parseInt(savedCodeId);
     }
 
-    // 方法2：让用户输入 code ID
     if (!codeId) {
       const userInput = prompt(
         '请输入 PRC-721 合约的 Code ID。\n\n' +
@@ -722,7 +723,6 @@ async function deployNFTContract() {
         codeId = parseInt(userInput.trim());
         localStorage.setItem('paxi_prc721_code_id', codeId.toString());
       } else {
-        // 跳过实际部署，仅保存配置
         btn.innerHTML = '🚀 部署 NFT 合约';
         btn.disabled = false;
         saveDeploymentRecord(name, symbol, description, maxSupply, royalty, mintPrice, null, initMsg, 'prepared');
@@ -731,7 +731,6 @@ async function deployNFTContract() {
       }
     }
 
-    // 构建 MsgInstantiateContract
     btn.innerHTML = '<span class="spinner"></span> 构建部署交易...';
 
     const instantiateMsg = PaxiCosmJS.MsgInstantiateContract.fromPartial({
@@ -748,7 +747,6 @@ async function deployNFTContract() {
       value: PaxiCosmJS.MsgInstantiateContract.encode(instantiateMsg).finish(),
     }));
 
-    // 2. 平台服务费（10 PAXI 转给 feeCollector）
     const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
       fromAddress: walletState.address,
       toAddress: CONFIG.feeCollector,
@@ -759,7 +757,6 @@ async function deployNFTContract() {
       value: PaxiCosmJS.MsgSend.encode(feeMsg).finish(),
     }));
 
-    // 签名 & 广播
     btn.innerHTML = '<span class="spinner"></span> 等待钱包签名...';
 
     const memo = `Paxi NFT Launcher: ${name} (${symbol}) | Fee: ${CONFIG.deployFee} PAXI`;
@@ -767,11 +764,9 @@ async function deployNFTContract() {
 
     if (broadcastRes.tx_response?.txhash && broadcastRes.tx_response.code === 0) {
       const txhash = broadcastRes.tx_response.txhash;
-      // 异步轮询交易确认
       pollTxStatus(txhash).then(conf => {
         if (conf.confirmed) showToast(conf.success ? '部署已上链确认' : '⚠️ 部署交易上链失败', conf.success ? 'success' : 'error');
       });
-      // 尝试从事件中提取合约地址
       let contractAddr = null;
       const events = broadcastRes.tx_response?.events || [];
       for (const ev of events) {
@@ -785,7 +780,6 @@ async function deployNFTContract() {
         }
       }
 
-      // 也可以从 logs 中查找
       if (!contractAddr && broadcastRes.tx_response?.logs) {
         for (const log of broadcastRes.tx_response.logs) {
           for (const ev of log.events || []) {
@@ -869,7 +863,7 @@ function saveDeploymentRecord(name, symbol, description, maxSupply, royalty, min
 }
 
 // ============================================================
-// 批量铸造 NFT
+// 批量铸造 NFT（修复版：安全 Token ID 生成）
 // ============================================================
 async function previewMintFee() {
   const contractAddr = document.getElementById('mintContractAddr').value.trim();
@@ -884,7 +878,6 @@ async function previewMintFee() {
     return;
   }
 
-  // 尝试查询合约的 mint 价格
   let mintPrice = 0;
   try {
     const queryMsg = { mint_price: {} };
@@ -894,7 +887,6 @@ async function previewMintFee() {
       mintPrice = parseInt(queryRes.data.mint_price) / 1e6;
     }
   } catch (e) {
-    // 如果查询失败，尝试其他查询方式
     try {
       const configQuery = btoa(JSON.stringify({ config: {} }));
       const configRes = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/contract/${contractAddr}/smart/${configQuery}`).then(r => r.json());
@@ -961,21 +953,16 @@ async function executeBatchMint() {
     }
 
     const messages = [];
-
-    // 1. 批量铸造消息 — 根据用户选择的模式决定
     const mintMode = document.getElementById('mintMode')?.value || 'auto';
     let useBatchMint = false;
 
     if (mintMode === 'batch') {
-      // 用户明确选择批量铸造
       useBatchMint = true;
     } else if (mintMode === 'auto') {
-      // 自动检测：尝试 batch_mint 查询，但不依赖查询成功与否判断执行支持
       try {
         const checkMsg = btoa(JSON.stringify({ batch_mint: { recipient: recipient, count: 1 } }));
         const checkRes = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/contract/${contractAddr}/smart/${checkMsg}`);
         if (checkRes.ok) {
-          // 查询成功 — 尝试使用 batch_mint（但仍可能有执行限制）
           useBatchMint = true;
           console.log('[Mint] batch_mint 查询成功，使用批量模式');
         }
@@ -983,9 +970,46 @@ async function executeBatchMint() {
         console.log('[Mint] batch_mint 查询失败，使用逐个铸造模式');
       }
     }
-    // mintMode === 'individual' 时直接 useBatchMint = false
+
+    // ============================================================
+    // 🔧 修复：安全获取起始 Token ID
+    // ============================================================
+    // 从输入框获取用户指定的起始 ID
+    let startTokenId = parseInt(document.getElementById('mintStartTokenId').value) || 1;
+    // 确保起始 ID >= 1
+    if (startTokenId < 1) startTokenId = 1;
+
+    // 逐个铸造模式下，先查询当前已铸造数量，避免 Token ID 冲突
+    if (!useBatchMint) {
+      try {
+        // 尝试查询当前 NFT 总供应量
+        const supplyQuery = btoa(JSON.stringify({ num_tokens: {} }));
+        const supplyRes = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/contract/${contractAddr}/smart/${supplyQuery}`);
+        if (supplyRes.ok) {
+          const supplyData = await supplyRes.json();
+          const currentSupply = parseInt(supplyData.data?.num_tokens || supplyData.data?.count || 0);
+          // 如果当前供应量 >= 起始 ID，自动调整起始 ID 到 currentSupply + 1
+          if (currentSupply >= startTokenId) {
+            const newStart = currentSupply + 1;
+            console.log(`[Mint] 当前供应量 ${currentSupply}，起始 Token ID 从 ${startTokenId} 调整为 ${newStart}`);
+            startTokenId = newStart;
+          }
+        }
+      } catch (e) {
+        console.log('[Mint] 无法查询当前供应量，将使用用户指定的起始 ID:', startTokenId);
+      }
+    }
+
+    // 读取 Token URI
+    let tokenUriInput = document.getElementById('mintTokenUri').value.trim();
+    let tokenUris = [];
+    if (tokenUriInput) {
+      tokenUris = tokenUriInput.split(',').map(u => u.trim()).filter(u => u);
+    }
+    const defaultTokenUri = coverImageUri || '';
 
     if (useBatchMint) {
+      // ===== 批量铸造模式 =====
       const batchMsg = { batch_mint: { recipient: recipient, count: count } };
       const batchFunds = [PaxiCosmJS.coins((BigInt(mintPriceMicro) * BigInt(count)).toString(), CONFIG.denom)[0]];
       const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
@@ -999,24 +1023,30 @@ async function executeBatchMint() {
         value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish(),
       }));
     } else {
-      // 逐个铸造（限制数量避免 gas 爆炸）
-      const maxIter = Math.min(count, 50); // 安全限制
+      // ===== 逐个铸造模式（安全修复版） =====
+      const maxIter = Math.min(count, 50);
       if (count > 50) {
         showToast('⚠️ 逐个铸造模式最多 50 枚/批，将铸造 50 枚。如需更多请分批操作。', 'error');
       }
-      // 官方 PRC-721 mint 格式：必须包含 token_id + owner，可选 token_uri
-      // 缺 token_id/owner 会导致合约 assert 失败
-      const tokenUri = coverImageUri || ''; // 单 NFT 的 metadata URI（IPFS/Arweave）
+
       for (let i = 0; i < maxIter; i++) {
-        const tokenId = String(Date.now()) + '-' + String(i); // 唯一 token_id
+        // 🔧 修复：使用纯数字 Token ID（从 startTokenId 开始递增）
+        const tokenId = String(startTokenId + i);
+        // 🔧 修复：token_uri 可以是 null（如果合约支持，或使用默认 URI）
+        const uri = (i < tokenUris.length && tokenUris[i]) ? tokenUris[i] : defaultTokenUri;
+
         const mintMsg = {
           mint: {
             token_id: tokenId,
             owner: recipient,
-            token_uri: tokenUri || null,
+            token_uri: uri || null,
           }
         };
-        const mintFunds = [PaxiCosmJS.coins(mintPriceMicro, CONFIG.denom)[0]];
+
+        const mintFunds = mintPriceMicro !== '0' 
+          ? [PaxiCosmJS.coins(mintPriceMicro, CONFIG.denom)[0]] 
+          : [];
+
         const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
           sender: walletState.address,
           contract: contractAddr,
@@ -1030,7 +1060,7 @@ async function executeBatchMint() {
       }
     }
 
-    // 2. 平台服务费（5 PAXI）
+    // 平台服务费
     const feeMicro = Math.floor(CONFIG.batchMintFee * 1e6).toString();
     const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
       fromAddress: walletState.address,
@@ -1054,10 +1084,10 @@ async function executeBatchMint() {
       statusEl.innerHTML = `
         <strong>✅ 批量铸造成功！</strong><br>
         铸造数量：${count} 枚<br>
+        起始 Token ID：${startTokenId}<br>
         平台服务费：${CONFIG.batchMintFee} PAXI<br>
         交易哈希：<code style="word-break:break-all">${escapeHtml(txhash)}</code>
       `;
-      // 异步轮询交易确认
       pollTxStatus(txhash).then(conf => {
         if (conf.confirmed) showToast(conf.success ? '铸造已上链确认' : '⚠️ 铸造交易上链失败', conf.success ? 'success' : 'error');
       });
@@ -1118,7 +1148,6 @@ async function executeMetadataUpdate() {
   try {
     const messages = [];
 
-    // 1. 更新 NFT 元数据消息
     const metaMsg = {
       update_metadata: {
         token_id: tokenId,
@@ -1141,7 +1170,6 @@ async function executeMetadataUpdate() {
       value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish(),
     }));
 
-    // 2. 平台服务费（2 PAXI）
     const feeMicro = Math.floor(CONFIG.metadataFeePerNFT * 1e6).toString();
     const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
       fromAddress: walletState.address,
@@ -1169,7 +1197,6 @@ async function executeMetadataUpdate() {
         平台服务费：${CONFIG.metadataFeePerNFT} PAXI<br>
         交易哈希：<code style="word-break:break-all">${escapeHtml(txhash)}</code>
       `;
-      // 异步轮询交易确认
       pollTxStatus(txhash).then(conf => {
         if (conf.confirmed) showToast(conf.success ? '元数据已上链确认' : '⚠️ 元数据交易上链失败', conf.success ? 'success' : 'error');
       });
