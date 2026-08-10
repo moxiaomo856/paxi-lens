@@ -1,6 +1,6 @@
 /**
  * Paxi 工具箱 - 主应用逻辑（完整版）
- * 包含：首页网格导航 + 所有工具 + 中英文切换 + 质押迁移 + P2P 买卖市场
+ * 包含：首页网格导航 + 所有工具 + 中英文切换 + 质押迁移 + P2P 买卖市场 + 治理提案
  */
 
 // ============================================================
@@ -21,6 +21,7 @@ const LANG = {
       gasCalc: 'gas计算',
       validatorCompare: '验证节点',
       p2pMarket: '买卖发布',
+      governance: '治理提案',
       later: '后期开发……'
     },
     batchTransfer: {
@@ -141,6 +142,43 @@ const LANG = {
       deleteConfirm: '确定删除这条广告吗？',
       deleted: '已删除'
     },
+    governance: {
+      title: '🗳️ 治理提案',
+      desc: '提交 Paxi 网络治理提案，参与社区决策。提案需要支付押金，由 PAXI 持有者投票决定。',
+      type: '提案类型',
+      text: '文本提案',
+      param: '参数修改',
+      titleLabel: '提案标题',
+      descLabel: '提案描述',
+      deposit: '押金 (PAXI)',
+      submitBtn: '📤 提交提案',
+      submitting: '提交中...',
+      listTitle: '📋 提案列表',
+      status: '状态',
+      voting: '投票中',
+      passed: '已通过',
+      rejected: '已拒绝',
+      depositPeriod: '押金期',
+      votingPeriod: '投票期',
+      depositAmount: '押金',
+      yes: '赞成',
+      no: '反对',
+      abstain: '弃权',
+      noWithVeto: '否决',
+      voteBtn: '投票',
+      voteSuccess: '✅ 投票成功！',
+      voteFail: '❌ 投票失败：',
+      submitSuccess: '✅ 提案提交成功！交易已广播',
+      submitFail: '❌ 提案提交失败：',
+      connectFirst: '请先连接钱包',
+      invalidTitle: '请输入提案标题',
+      invalidDesc: '请输入提案描述',
+      invalidDeposit: '押金必须大于 0',
+      loading: '加载提案中...',
+      noProposals: '暂无提案',
+      feeLabel: '手续费 (PAXI)',
+      feeAmount: '{fee}'
+    },
     common: {
       connectFirst: '请先连接钱包',
       sending: '发送中...',
@@ -150,6 +188,7 @@ const LANG = {
       mainnet: '主网',
       testnet: '测试网',
       langSwitch: '中/English',
+      delete: '删除'
     }
   },
   en: {
@@ -166,6 +205,7 @@ const LANG = {
       gasCalc: 'Gas Calc',
       validatorCompare: 'Validators',
       p2pMarket: 'P2P Market',
+      governance: 'Governance',
       later: 'Coming Soon…'
     },
     batchTransfer: {
@@ -286,6 +326,43 @@ const LANG = {
       deleteConfirm: 'Delete this ad?',
       deleted: 'Deleted'
     },
+    governance: {
+      title: '🗳️ Governance',
+      desc: 'Submit Paxi network governance proposals. Deposit required, voted by PAXI holders.',
+      type: 'Proposal Type',
+      text: 'Text Proposal',
+      param: 'Parameter Change',
+      titleLabel: 'Proposal Title',
+      descLabel: 'Proposal Description',
+      deposit: 'Deposit (PAXI)',
+      submitBtn: '📤 Submit Proposal',
+      submitting: 'Submitting...',
+      listTitle: '📋 Proposals',
+      status: 'Status',
+      voting: 'Voting',
+      passed: 'Passed',
+      rejected: 'Rejected',
+      depositPeriod: 'Deposit Period',
+      votingPeriod: 'Voting Period',
+      depositAmount: 'Deposit',
+      yes: 'Yes',
+      no: 'No',
+      abstain: 'Abstain',
+      noWithVeto: 'No with Veto',
+      voteBtn: 'Vote',
+      voteSuccess: '✅ Vote successful!',
+      voteFail: '❌ Vote failed: ',
+      submitSuccess: '✅ Proposal submitted! Tx broadcasted',
+      submitFail: '❌ Proposal failed: ',
+      connectFirst: 'Please connect wallet first',
+      invalidTitle: 'Please enter proposal title',
+      invalidDesc: 'Please enter proposal description',
+      invalidDeposit: 'Deposit must be greater than 0',
+      loading: 'Loading proposals...',
+      noProposals: 'No proposals found',
+      feeLabel: 'Fee (PAXI)',
+      feeAmount: '{fee}'
+    },
     common: {
       connectFirst: 'Please connect wallet first',
       sending: 'Sending...',
@@ -295,6 +372,7 @@ const LANG = {
       mainnet: 'Mainnet',
       testnet: 'Testnet',
       langSwitch: 'English/中',
+      delete: 'Delete'
     }
   }
 };
@@ -328,12 +406,11 @@ function updateHeaderUI() {
   if (btnConnect) btnConnect.textContent = t('common.connect');
   const btnDisconnect = document.getElementById('btnDisconnect');
   if (btnDisconnect) btnDisconnect.textContent = t('common.disconnect');
-  // 重新渲染网络选择器
   if (typeof renderNetworkSelector === 'function') renderNetworkSelector('networkSelector');
 }
 
 // ============================================================
-// 配置
+// 配置（🔥 手续费金额在这里统一管理）
 // ============================================================
 const CONFIG = {
   get rpc() { return getNetworkConfig().rpc; },
@@ -347,6 +424,8 @@ const CONFIG = {
   feeCollector: SHARED_CONFIG.feeCollector,
   feeRate: SHARED_CONFIG.feeRate,
   nftMarket: SHARED_CONFIG.nftMarket,
+  // 🔥 治理提案手续费（修改这里即可调整费用）
+  proposalFee: 20, // PAXI
 };
 
 // ============================================================
@@ -379,16 +458,53 @@ const state = {
 // 初始化
 // ============================================================
 function initApp() {
-  updateHeaderUI();
-  renderHome();
-  checkWalletInjection();
+  try {
+    updateHeaderUI();
+  } catch (e) { console.error('[initApp] updateHeaderUI error:', e); }
+  try {
+    renderHome();
+  } catch (e) {
+    console.error('[initApp] renderHome error, fallback UI used:', e);
+    bindFallbackHome();
+  }
+  try {
+    checkWalletInjection();
+  } catch (e) { console.error('[initApp] checkWalletInjection error:', e); }
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
-} else {
+// 兜底：当 renderHome 失败时，把 index.html 中的静态 fallback 卡片绑定点击
+function bindFallbackHome() {
+  const container = document.getElementById('mainContent');
+  if (!container) return;
+  const map = [
+    'batch-transfer','balance-check','nft-market','tx-tracker','nft-launcher',
+    'address-convert','redelegate','gas-calc','validator-compare','p2p-market','governance','later'
+  ];
+  container.querySelectorAll('.tool-card').forEach((card, idx) => {
+    card.addEventListener('click', () => {
+      const toolId = map[idx];
+      if (toolId === 'later') { showToast('后期开发……', 'info'); return; }
+      navigateToTool(toolId);
+    });
+  });
+}
+
+// 安全启动：如果 DOMContentLoaded 已过则立即执行，同时用 setTimeout 兜底
+function safeStart() {
   initApp();
 }
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', safeStart);
+} else {
+  safeStart();
+}
+// 二次兜底：150ms 后如果 #homeFallback 还在但没看到动态渲染，再跑一次（兼容 async SDK）
+setTimeout(function () {
+  const main = document.getElementById('mainContent');
+  if (main && main.querySelector('#homeFallback') && main.childElementCount <= 2) {
+    try { bindFallbackHome(); } catch (e) {}
+  }
+}, 150);
 
 function checkWalletInjection() {
   let attempts = 0;
@@ -435,6 +551,7 @@ function renderHome() {
     { id: 'gas-calc', icon: '⛽', label: 'tools.gasCalc' },
     { id: 'validator-compare', icon: '🏦', label: 'tools.validatorCompare' },
     { id: 'p2p-market', icon: '📊', label: 'tools.p2pMarket' },
+    { id: 'governance', icon: '🗳️', label: 'tools.governance' },
     { id: 'later', icon: '📌', label: 'tools.later' },
   ];
 
@@ -449,7 +566,6 @@ function renderHome() {
     </div>
   `;
 
-  // 事件委托，避免内联 onclick 注入翻译文本导致的 XSS / 语法破坏
   main.querySelectorAll('.tool-card[data-tool]').forEach(card => {
     card.addEventListener('click', () => {
       const toolId = card.dataset.tool;
@@ -481,6 +597,7 @@ function renderTool(tool) {
     case 'gas-calc': content = renderGasCalc(); break;
     case 'validator-compare': content = renderValidatorCompare(); break;
     case 'p2p-market': content = renderP2pMarket(); break;
+    case 'governance': content = renderGovernance(); break;
     default: content = '<p style="color:var(--text-muted);text-align:center;padding:20px;">工具加载中...</p>';
   }
   main.innerHTML = `
@@ -501,7 +618,8 @@ function bindToolEvents(tool) {
     case 'validator-compare': loadValidatorData(); break;
     case 'token-info': bindTokenInfoEvents(); break;
     case 'redelegate': loadRedelegateData(); break;
-    case 'p2p-market': break; // P2P 市场不需要额外绑定事件
+    case 'p2p-market': break;
+    case 'governance': loadProposals(); break;
   }
 }
 
@@ -805,9 +923,9 @@ async function executeBatchTransfer() {
   statusEl.innerHTML = `<div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 准备打包发送（共 ${total} 笔）...</div>`;
   try {
     const sender = state.wallet;
+    if (!sender || !sender.address) throw new Error('钱包未连接');
     const denom = CONFIG.denom;
     const tokenType = state.batchTokenType;
-    const chainId = CONFIG.chainId;
     let totalAmountMicro = BigInt(0);
     for (const r of state.batchRecipients) totalAmountMicro += BigInt(paxiToUpaxi(r.amount));
     const feeMicro = (totalAmountMicro * BigInt(Math.round(CONFIG.feeRate * 100)) / BigInt(10000)).toString();
@@ -819,11 +937,11 @@ async function executeBatchTransfer() {
     const actualFeeMicro = tokenType === 'nft' ? fixedFeeMicro : feeMicro;
     const actualFeePaxi = upaxiToPaxi(actualFeeMicro);
 
+    // 构建消息（保持原逻辑）
     const allMessages = [];
     for (const r of state.batchRecipients) {
-      let amountMicro;
       if (tokenType === 'native') {
-        amountMicro = paxiToUpaxi(r.amount);
+        const amountMicro = paxiToUpaxi(r.amount);
         const msg = PaxiCosmJS.MsgSend.fromPartial({ fromAddress: sender.address, toAddress: r.address, amount: [PaxiCosmJS.coins(amountMicro, denom)[0]] });
         allMessages.push(PaxiCosmJS.Any.fromPartial({ typeUrl: '/cosmos.bank.v1beta1.MsgSend', value: PaxiCosmJS.MsgSend.encode(msg).finish() }));
       } else if (tokenType === 'prc20') {
@@ -852,38 +970,15 @@ async function executeBatchTransfer() {
       allMessages.push(PaxiCosmJS.Any.fromPartial({ typeUrl: '/cosmos.bank.v1beta1.MsgSend', value: PaxiCosmJS.MsgSend.encode(feeMsg).finish() }));
     }
 
-    const accountRes = await fetch(`${CONFIG.lcd}/cosmos/auth/v1beta1/accounts/${sender.address}`);
-    const accountData = await accountRes.json();
-    const account = accountData.account?.base_account || accountData.account;
-    const accountNumber = Number(account.account_number);
-    const sequence = Number(account.sequence);
-
     btn.innerHTML = '<span class="spinner"></span> 构建交易...';
-    statusEl.innerHTML = `<div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 打包发送 ${total} 笔转账 + 手续费</div><div style="font-size:13px;">📤 共 ${allMessages.length} 条消息打包中...</div>`;
+    statusEl.innerHTML = `<div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 打包发送 ${total} 笔转账 + 手续费</div><div style="font-size:13px;">📤 共 ${allMessages.length} 条消息打包中（将自动进行 Gas 模拟）...</div>`;
 
-    const txBody = PaxiCosmJS.TxBody.fromPartial({ messages: allMessages, memo: `Paxi Toolbox Transfer (${total} recipients) | Fee: ${actualFeePaxi} PAXI` });
-    const totalGas = allMessages.length * 90000 + 200000;
-    const fee = { amount: [PaxiCosmJS.coins(Math.floor(totalGas * 0.05).toString(), denom)[0]], gasLimit: totalGas };
-    const pubkeyBytes = typeof sender.public_key === 'string' ? fromBase64(sender.public_key) : new Uint8Array(sender.public_key);
-    const pubkeyAny = { typeUrl: '/cosmos.crypto.secp256k1.PubKey', value: PaxiCosmJS.PubKey.encode({ key: pubkeyBytes }).finish() };
-    const authInfo = PaxiCosmJS.AuthInfo.fromPartial({ signerInfos: [{ publicKey: pubkeyAny, modeInfo: { single: { mode: 1 } }, sequence: BigInt(sequence) }], fee });
-    const signDoc = PaxiCosmJS.SignDoc.fromPartial({ bodyBytes: PaxiCosmJS.TxBody.encode(txBody).finish(), authInfoBytes: PaxiCosmJS.AuthInfo.encode(authInfo).finish(), chainId, accountNumber: BigInt(accountNumber) });
-    const txObj = { bodyBytes: toBase64(signDoc.bodyBytes), authInfoBytes: toBase64(signDoc.authInfoBytes), chainId, accountNumber: signDoc.accountNumber.toString() };
-
+    // 🔥 问题5修复：复用通用 buildSignAndBroadcast（自动受益于 Gas 模拟 + 配置化 GasPrice + 错误映射）
     btn.innerHTML = '<span class="spinner"></span> 等待钱包签名...';
-    const result = await window.paxihub.paxi.signAndSendTransaction(txObj);
-    if (!result || !result.success) throw new Error(result?.message || '签名失败或被拒绝');
-    const sigBytes = fromBase64(result.success);
-    const txRaw = PaxiCosmJS.TxRaw.fromPartial({ bodyBytes: signDoc.bodyBytes, authInfoBytes: signDoc.authInfoBytes, signatures: [sigBytes] });
-    const txBytes = PaxiCosmJS.TxRaw.encode(txRaw).finish();
-    const base64Tx = toBase64(txBytes);
-
-    btn.innerHTML = '<span class="spinner"></span> 广播交易中...';
-    const broadcastRes = await fetch(`${CONFIG.lcd}/cosmos/tx/v1beta1/txs`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tx_bytes: base64Tx, mode: 'BROADCAST_MODE_SYNC' })
-    }).then(r => r.json());
+    const memo = `Paxi Toolbox Transfer (${total} recipients) | Fee: ${actualFeePaxi} PAXI`;
+    const broadcastRes = await buildSignAndBroadcast(allMessages, memo, null, sender);
     const txResult = checkTxResult(broadcastRes);
+
     if (txResult.ok) {
       statusEl.className = 'status-msg success';
       statusEl.innerHTML = `
@@ -1008,42 +1103,37 @@ async function showAddressTxHistory(address) {
   container.innerHTML = '<p style="color:var(--text-muted)">⏳ 加载中...</p>';
   card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   try {
-    let txs = [], found = false;
-    const queryMethods = [
+    // 问题10修复：扩展查询事件，覆盖转入+转出+合约调用，合并去重
+    const queryEvents = [
       `events=transfer.recipient='${address}'`,
+      `events=transfer.sender='${address}'`,
+      `events=message.sender='${address}'`,
       `events=message.recipient='${address}'`,
-      `events=coin_received.receiver='${address}'`
+      `events=coin_received.receiver='${address}'`,
+      `events=coin_spent.spender='${address}'`,
     ];
-    for (const query of queryMethods) {
+    const allTxMap = {};
+    for (const query of queryEvents) {
       try {
         const url = `${CONFIG.lcd}/cosmos/tx/v1beta1/txs?${query}&pagination.limit=30&order_by=DESC`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
-          if (data.tx_responses && data.tx_responses.length > 0) {
-            txs = data.tx_responses;
-            found = true;
-            break;
+          if (data.tx_responses) {
+            for (const tx of data.tx_responses) {
+              if (tx.txhash) allTxMap[tx.txhash] = tx;
+            }
           }
         }
       } catch (e) {}
     }
-    if (!found || txs.length === 0) {
-      try {
-        const url = `${CONFIG.lcd}/cosmos/tx/v1beta1/txs?events=message.sender='${address}'&pagination.limit=10&order_by=DESC`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.tx_responses && data.tx_responses.length > 0) {
-            const sentTxs = data.tx_responses || [];
-            const allTxMap = {};
-            for (const tx of [...txs, ...sentTxs]) if (tx.txhash) allTxMap[tx.txhash] = tx;
-            txs = Object.values(allTxMap);
-            found = true;
-          }
-        }
-      } catch (e) {}
-    }
+    // 按时间倒序排列
+    let txs = Object.values(allTxMap).sort((a, b) => {
+      const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return tb - ta;
+    });
+    const found = txs.length > 0;
     if (!found || txs.length === 0) {
       container.innerHTML = `
         <div style="text-align:center;padding:20px 0;">
@@ -1056,52 +1146,78 @@ async function showAddressTxHistory(address) {
       `;
       return;
     }
-    let html = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">📌 地址：<code style="word-break:break-all;font-size:11px;">${escapeHtml(address)}</code><span style="margin-left:12px;font-size:11px;color:var(--success);">✅ 找到 ${txs.length} 笔交易</span></div><div style="max-height:500px;overflow-y:auto;">`;
-    let hasTransfer = false;
-    for (const tx of txs.slice(0,30)) {
+    let html = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">📌 地址：<code style="word-break:break-all;font-size:11px;">${escapeHtml(address)}</code><span style="margin-left:12px;font-size:11px;color:var(--success);">✅ 找到 ${txs.length} 笔交易</span></div><div style="margin-bottom:10px;"><a href="https://explorer.paxinet.io/address/${address}" target="_blank" style="display:inline-block;padding:6px 16px;background:var(--primary);color:white;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;">🔗 在区块浏览器查看完整记录</a></div><div style="max-height:500px;overflow-y:auto;">`;
+    let hasTx = false;
+    for (const tx of txs.slice(0,50)) {
       const msgs = tx.tx?.body?.messages || [];
       const success = tx.code === 0;
       const time = tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '--';
+      const isBatch = msgs.length > 1;
+      // 检查是否包含与该地址相关的 MsgSend
+      let sendInfo = null;
       for (const m of msgs) {
         const typeUrl = m['@type'] || m.typeUrl || '';
-        let from='', to='', amount='0', denom='upaxi';
         if (typeUrl.includes('MsgSend')) {
           const msgData = m.value || m;
-          from = msgData.from_address || '--';
-          to = msgData.to_address || '--';
-          if (msgData.amount && msgData.amount.length > 0) {
-            amount = msgData.amount[0].amount || '0';
-            denom = msgData.amount[0].denom || 'upaxi';
+          const from = msgData.from_address || '';
+          const to = msgData.to_address || '';
+          if (from === address || to === address) {
+            let amount = '0', denom = 'upaxi';
+            if (msgData.amount && msgData.amount.length > 0) {
+              amount = msgData.amount[0].amount || '0';
+              denom = msgData.amount[0].denom || 'upaxi';
+            }
+            sendInfo = { from, to, amount, denom, isReceived: to === address };
+            break;
           }
         }
-        if (from === address || to === address) {
-          hasTransfer = true;
-          const isReceived = to === address;
-          const displayAmount = denom === 'upaxi' ? upaxiToPaxi(amount) : amount;
-          const isBatch = msgs.length > 1;
-          html += `
-            <div style="background:var(--bg);border-radius:6px;padding:8px 12px;margin-bottom:4px;border-left:3px solid ${success ? (isReceived ? 'var(--success)' : 'var(--warning)') : 'var(--danger)'};">
-              <div style="display:flex;justify-content:space-between;font-size:11px;">
-                <span>
-                  ${success ? '✅' : '❌'}
-                  ${isReceived ? `<span style="color:var(--success);font-weight:600;">⬇️ +${displayAmount} ${denom === 'upaxi' ? 'PAXI' : denom}</span>` : `<span style="color:var(--warning);font-weight:600;">⬆️ -${displayAmount} ${denom === 'upaxi' ? 'PAXI' : denom}</span>`}
-                  <span style="color:var(--text-muted);font-size:10px;">${isReceived ? '从' : '到'} ${isReceived ? from.slice(0,10) : to.slice(0,10)}...${isReceived ? from.slice(-4) : to.slice(-4)}</span>
-                  ${isBatch ? `<span style="color:var(--warning);font-size:9px;background:rgba(245,158,11,0.15);padding:1px 6px;border-radius:4px;">📦 批量</span>` : ''}
-                </span>
-                <span style="color:var(--text-muted);font-size:10px;">${time}</span>
-              </div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">
-                Tx: <code>${tx.txhash.slice(0,16)}...</code>
-                <a href="https://explorer.paxinet.io/tx/${tx.txhash}" target="_blank" style="color:var(--primary);">🔗</a>
-                ${isBatch ? `<span style="color:var(--text-muted);font-size:10px;">（共${msgs.length}条消息）</span>` : ''}
-              </div>
-            </div>
-          `;
+      }
+      // 判断该交易是否与地址相关（含非转账类交易）
+      const firstMsg = msgs[0] || {};
+      const firstTypeUrl = firstMsg['@type'] || firstMsg.typeUrl || '';
+      const senderField = firstMsg.value?.sender || firstMsg.sender || firstMsg.value?.from_address || firstMsg.from_address || '';
+      const isRelated = sendInfo || senderField === address;
+
+      if (isRelated) {
+        hasTx = true;
+        let label, labelColor;
+        if (sendInfo) {
+          const displayAmount = sendInfo.denom === 'upaxi' ? upaxiToPaxi(sendInfo.amount) : sendInfo.amount;
+          label = sendInfo.isReceived
+            ? `⬇️ +${displayAmount} ${sendInfo.denom === 'upaxi' ? 'PAXI' : sendInfo.denom}`
+            : `⬆️ -${displayAmount} ${sendInfo.denom === 'upaxi' ? 'PAXI' : sendInfo.denom}`;
+          labelColor = sendInfo.isReceived ? 'var(--success)' : 'var(--warning)';
+        } else {
+          // 非转账类交易（合约调用等）
+          const shortType = firstTypeUrl.split('.').pop().replace('Msg', '').replace(/^./, c => c.toLowerCase());
+          label = `📋 ${shortType}`;
+          labelColor = 'var(--primary)';
         }
+        const counterparty = sendInfo
+          ? (sendInfo.isReceived ? sendInfo.from : sendInfo.to)
+          : '';
+        html += `
+          <div style="background:var(--bg);border-radius:6px;padding:8px 12px;margin-bottom:4px;border-left:3px solid ${success ? labelColor : 'var(--danger)'};">
+            <div style="display:flex;justify-content:space-between;font-size:11px;">
+              <span>
+                ${success ? '✅' : '❌'}
+                <span style="color:${labelColor};font-weight:600;">${label}</span>
+                ${counterparty ? `<span style="color:var(--text-muted);font-size:10px;">${sendInfo.isReceived ? '从' : '到'} ${counterparty.slice(0,10)}...${counterparty.slice(-4)}</span>` : ''}
+                ${isBatch ? `<span style="color:var(--warning);font-size:9px;background:rgba(245,158,11,0.15);padding:1px 6px;border-radius:4px;">📦 批量</span>` : ''}
+              </span>
+              <span style="color:var(--text-muted);font-size:10px;">${time}</span>
+            </div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">
+              Tx: <code>${tx.txhash.slice(0,16)}...</code>
+              <a href="https://explorer.paxinet.io/tx/${tx.txhash}" target="_blank" style="color:var(--primary);">🔗</a>
+              ${isBatch ? `<span style="color:var(--text-muted);font-size:10px;">（共${msgs.length}条消息）</span>` : ''}
+            </div>
+          </div>
+        `;
       }
     }
-    if (!hasTransfer) html += `<p style="color:var(--text-muted);text-align:center;padding:20px 0;">未找到与当前地址相关的转账记录</p>`;
-    html += `</div><div style="text-align:center;margin-top:10px;font-size:12px;"><a href="https://explorer.paxinet.io/address/${address}" target="_blank" style="color:var(--primary);">🔗 在区块浏览器查看全部交易 →</a><div style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 批量空投的转账都在「转入记录」中，如果钱包不显示，请以区块浏览器为准</div></div>`;
+    if (!hasTx) html += `<p style="color:var(--text-muted);text-align:center;padding:20px 0;">未找到与当前地址相关的交易记录</p>`;
+    html += `</div><div style="text-align:center;margin-top:10px;font-size:12px;"><div style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 以上为链上查询结果，完整记录请以区块浏览器为准</div></div>`;
     container.innerHTML = html;
   } catch (e) {
     console.error('查询交易记录失败:', e);
@@ -1255,7 +1371,9 @@ function convertAddress() {
   }
 }
 
+// ============================================================
 // Bech32 实现
+// ============================================================
 const BECH32_ALPHABET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
 const BECH32_CONST = 1;
 function bech32Polymod(values) {
@@ -1375,8 +1493,23 @@ async function loadValidatorData() {
       status: v.status === 'BOND_STATUS_BONDED' ? '✅ 活跃' : '⚠️ 待定',
       jailed: v.jailed,
     })).sort((a,b) => b.votingPower - a.votingPower);
-    const annualInflation = 0.08;
-    const totalSupply = 72_000_000;
+    // 问题9修复：从链上查询通胀率和总供应量，失败则降级为固定值
+    let annualInflation = 0.08;
+    let totalSupply = 72_000_000;
+    let inflationSource = '默认值';
+    try {
+      const inflationRes = await fetchAPI('/cosmos/mint/v1beta1/inflation');
+      if (inflationRes?.inflation) {
+        annualInflation = parseFloat(inflationRes.inflation);
+        inflationSource = '链上查询';
+      }
+    } catch (e) { console.warn('[Validator] 查询通胀率失败，使用默认值:', e.message); }
+    try {
+      const supplyRes = await fetchAPI(`/cosmos/bank/v1beta1/supply/by_denom?denom=${getDenom()}`);
+      if (supplyRes?.amount?.amount) {
+        totalSupply = parseInt(supplyRes.amount.amount) / 1e6;
+      }
+    } catch (e) { console.warn('[Validator] 查询总供应量失败，使用默认值:', e.message); }
     const annualReward = totalSupply * annualInflation * 0.95;
     const estimatedAPR = bondedTokens > 0 ? (annualReward / bondedTokens) * 100 : 0;
     document.getElementById('vcResults').innerHTML = `
@@ -1385,6 +1518,7 @@ async function loadValidatorData() {
         <div class="stat-card"><div class="stat-value">${bondedTokens.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="stat-label">总质押量 (PAXI)</div></div>
         <div class="stat-card"><div class="stat-value">${estimatedAPR.toFixed(1)}%</div><div class="stat-label">预估 APR</div></div>
       </div>
+      <div style="font-size:11px;color:var(--text-muted);margin:0 0 12px 4px;">📊 通胀率：${(annualInflation * 100).toFixed(2)}%（${inflationSource}）| 总供应量：${totalSupply.toLocaleString(undefined,{maximumFractionDigits:0})} PAXI</div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>#</th><th>节点名称</th><th>状态</th><th>投票权重</th><th>佣金率</th><th>预估收益</th></tr></thead>
@@ -1527,15 +1661,36 @@ function getAllActiveListings() {
   return all.filter(l => new Date(l.expiresAt) > new Date());
 }
 
+// 安全的 JSON <-> Base64 编码（使用 TextEncoder，替代已废弃的 unescape/escape）
+function jsonToBase64(obj) {
+  const jsonStr = JSON.stringify(obj);
+  const bytes = new TextEncoder().encode(jsonStr);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+}
+function base64ToJson(b64) {
+  const binary = atob(b64.trim());
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const jsonStr = new TextDecoder().decode(bytes);
+  return JSON.parse(jsonStr);
+}
+
 function generateShareCode(listing) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(listing))));
+  return jsonToBase64(listing);
 }
 function parseShareCode(code) {
-  const json = decodeURIComponent(escape(atob(code.trim())));
-  return JSON.parse(json);
+  return base64ToJson(code);
 }
 function generateBuyRequestCode(listing, buyer) {
-  return btoa(unescape(encodeURIComponent(JSON.stringify({
+  return jsonToBase64({
     type: 'buy_request',
     listingId: listing.id,
     contract: listing.contract,
@@ -1544,11 +1699,10 @@ function generateBuyRequestCode(listing, buyer) {
     seller: listing.seller,
     buyer,
     timestamp: new Date().toISOString(),
-  }))));
+  });
 }
 function parseBuyRequestCode(code) {
-  const json = decodeURIComponent(escape(atob(code.trim())));
-  return JSON.parse(json);
+  return base64ToJson(code);
 }
 
 async function queryNftOwner(contract, tokenId) {
@@ -1560,6 +1714,15 @@ async function queryNftOwner(contract, tokenId) {
   return data.data?.owner;
 }
 async function queryNftInfo(contract, tokenId) {
+  try {
+    const queryMsg = { all_nft_info: { token_id: String(tokenId) } };
+    const encodedMsg = btoa(JSON.stringify(queryMsg));
+    const res = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/contract/${contract}/smart/${encodedMsg}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.data) return data.data;
+    }
+  } catch (e) {}
   const owner = await queryNftOwner(contract, tokenId);
   let info = {};
   try {
@@ -2255,9 +2418,73 @@ async function executeBuy() {
     btn.innerHTML = '🚀 执行原子购买';
   }
 }
-function delistNft(listingId) {
-  if (!confirm('确定下架此 NFT？')) return;
+async function delistNft(listingId) {
+  const listings = getMarketListings();
+  const listing = listings.find(l => l.id === listingId);
+  if (!listing) {
+    removeListing(listingId);
+    showToast('已下架', 'success');
+    renderTool('nft-market');
+    return;
+  }
+
+  // 如果处于已授权状态且有 grantee，需要先撤销链上授权
+  if (listing.status === 'granted' && listing.grantee) {
+    if (!state.connected || !state.wallet) {
+      showToast('请先连接钱包以撤销链上授权', 'error');
+      return;
+    }
+    const grant = await checkGrantStatus(state.wallet.address, listing.grantee).catch(() => null);
+    const stillValid = grant && new Date(grant.expiration) > new Date();
+
+    if (stillValid) {
+      const msg = '⚠️ 此 NFT 当前有有效授权！\n\n' +
+        `买家 ${listing.grantee.slice(0, 12)}... 仍可在授权到期前完成购买。\n\n` +
+        '点击「确定」将：\n' +
+        '1) 向链上发送撤销授权交易（需钱包签名）\n' +
+        '2) 撤销成功后从本地移除记录\n\n' +
+        '点击「取消」则不执行任何操作。';
+      if (!confirm(msg)) return;
+
+      try {
+        showToast('正在撤销链上授权...', 'info');
+        // 调用已有的 revokeGrant 逻辑（内部会 buildSignAndBroadcast）
+        const revokeMsg = PaxiCosmJS.MsgRevoke.fromPartial({
+          granter: state.wallet.address,
+          grantee: listing.grantee,
+          msgTypeUrl: CONFIG.nftMarket.msgTypeUrl,
+        });
+        const messages = [PaxiCosmJS.Any.fromPartial({
+          typeUrl: '/cosmos.authz.v1beta1.MsgRevoke',
+          value: PaxiCosmJS.MsgRevoke.encode(revokeMsg).finish(),
+        })];
+        const res = await buildSignAndBroadcast(messages, 'Paxi NFT Market: Revoke grant on delist', null, state.wallet);
+        const txResult = checkTxResult(res);
+        if (!txResult.ok) {
+          throw new Error(mapError(txResult.code, txResult.rawLog));
+        }
+        // 等待上链确认后再删除本地记录
+        const conf = await pollTxStatus(txResult.txhash, 20, 2000);
+        if (conf.confirmed && !conf.success) {
+          throw new Error('撤销交易上链但执行失败，请稍后重试');
+        }
+        showToast('✅ 授权已撤销，正在下架...', 'success');
+      } catch (e) {
+        showToast('❌ 撤销授权失败：' + (e.message || '未知错误'), 'error');
+        // 二次确认：是否仍要删除本地记录（强制下架）
+        const force = confirm('撤销链上授权失败。\n\n是否仍要从本地强制下架？（注意：若链上授权仍有效，买家可能还能执行购买）');
+        if (!force) return;
+      }
+    } else {
+      // 授权已过期，不需要链上操作
+      if (!confirm('授权已过期，是否下架此 NFT？')) return;
+    }
+  } else {
+    if (!confirm('确定下架此 NFT？')) return;
+  }
+
   removeListing(listingId);
+  removeImportedListing(listingId);
   showToast('已下架', 'success');
   renderTool('nft-market');
 }
@@ -2646,9 +2873,338 @@ function deleteP2pAd(id) {
 }
 
 // ============================================================
+// 工具 11: 治理提案 🗳️（🔥 手续费从 CONFIG.proposalFee 读取）
+// ============================================================
+function renderGovernance() {
+  const feeDisplay = CONFIG.proposalFee || 20;
+  return `
+    <div class="card">
+      <div class="card-title">${t('governance.title')}</div>
+      <div class="tool-desc">${t('governance.desc')}</div>
+
+      <!-- 提交提案表单 -->
+      <div style="background:var(--bg);border-radius:8px;padding:16px;margin-bottom:16px;">
+        <div style="font-weight:600;font-size:14px;margin-bottom:10px;">📝 ${t('governance.submitBtn')}</div>
+        <div class="form-group">
+          <label class="form-label">${t('governance.type')}</label>
+          <select id="propType" onchange="toggleParamFields()">
+            <option value="text">${t('governance.text')}</option>
+            <option value="param">${t('governance.param')}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('governance.titleLabel')}</label>
+          <input type="text" id="propTitle" placeholder="例如：建议降低交易手续费">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('governance.descLabel')}</label>
+          <textarea id="propDesc" placeholder="详细描述你的提案..." style="min-height:80px;"></textarea>
+        </div>
+
+        <!-- ===== 参数修改专属字段（默认隐藏） ===== -->
+        <div id="paramFields" style="display:none;padding:12px;border-radius:8px;background:var(--bg-card);margin-bottom:14px;border:1px solid var(--border);">
+          <div style="font-size:12px;font-weight:600;color:var(--primary);margin-bottom:10px;">🔧 参数修改配置（ParameterChangeProposal）</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Subspace (模块名)</label>
+              <input type="text" id="paramSubspace" placeholder="例如: staking, bank, gov, mint" value="staking">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Key (参数名)</label>
+              <input type="text" id="paramKey" placeholder="例如: MinDelegation, MaxValidators" value="MinDelegation">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Value (新值，JSON 格式；字符串需加双引号)</label>
+            <input type="text" id="paramValue" placeholder='例如: "1000000" 或 1000000 或 "0.050000000000000000"' value='"1000000"'>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">💡 字符串类型必须包含双引号，例如 <code style="font-size:10px;">"1000000"</code>；数值和布尔不加。</div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);line-height:1.6;">
+            <strong>常用模块 & 参数参考：</strong><br>
+            • staking / UnbondingTime = <code>"1814400000000000"</code><br>
+            • staking / MaxValidators = <code>100</code><br>
+            • staking / MinDelegation = <code>"1000000"</code><br>
+            • mint / InflationRateChange = <code>"0.130000000000000000"</code><br>
+            • gov / MaxDepositPeriod = <code>"1209600000000000"</code><br>
+            • gov / VotingPeriod = <code>"1209600000000000"</code>
+          </div>
+        </div>
+        <!-- ===== 参数修改字段结束 ===== -->
+
+        <div class="form-group">
+          <label class="form-label">${t('governance.deposit')}</label>
+          <input type="number" id="propDeposit" placeholder="100" min="1" step="1">
+        </div>
+        <!-- ===== 手续费显示 ===== -->
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;color:var(--text-muted);border-top:1px solid var(--border);margin-top:8px;padding-top:8px;">
+          <span>${t('governance.feeLabel')}</span>
+          <span style="color:var(--primary);font-weight:600;">${feeDisplay} PAXI</span>
+        </div>
+        <!-- ===== 结束 ===== -->
+        <button class="btn btn-primary btn-block" id="btnSubmitProposal" onclick="submitProposal()">
+          ${t('governance.submitBtn')}
+        </button>
+        <div class="status-msg" id="propStatus"></div>
+      </div>
+
+      <!-- 提案列表 -->
+      <div style="margin-top:12px;">
+        <div style="font-weight:600;font-size:14px;margin-bottom:10px;">${t('governance.listTitle')}</div>
+        <div id="proposalList"></div>
+      </div>
+    </div>
+  `;
+}
+
+// 根据提案类型切换参数表单显示
+function toggleParamFields() {
+  const type = document.getElementById('propType')?.value;
+  const fields = document.getElementById('paramFields');
+  if (fields) {
+    fields.style.display = type === 'param' ? 'block' : 'none';
+  }
+}
+
+async function loadProposals() {
+  const listEl = document.getElementById('proposalList');
+  if (!listEl) return;
+
+  listEl.innerHTML = `<div style="text-align:center;padding:20px;"><span class="spinner"></span> ${t('governance.loading')}</div>`;
+
+  try {
+    const res = await fetch(`${CONFIG.lcd}/cosmos/gov/v1beta1/proposals?pagination.limit=50`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const proposals = data.proposals || [];
+
+    if (proposals.length === 0) {
+      listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);">${t('governance.noProposals')}</div>`;
+      return;
+    }
+
+    listEl.innerHTML = proposals.map(p => {
+      const statusMap = {
+        'PROPOSAL_STATUS_DEPOSIT_PERIOD': '⏳ ' + t('governance.depositPeriod'),
+        'PROPOSAL_STATUS_VOTING_PERIOD': '🗳️ ' + t('governance.voting'),
+        'PROPOSAL_STATUS_PASSED': '✅ ' + t('governance.passed'),
+        'PROPOSAL_STATUS_REJECTED': '❌ ' + t('governance.rejected'),
+      };
+      const status = statusMap[p.status] || p.status;
+      const deposit = p.total_deposit?.[0]?.amount || '0';
+      const depositDisplay = deposit / 1e6;
+      const statusClass = {
+        'PROPOSAL_STATUS_DEPOSIT_PERIOD': 'deposit',
+        'PROPOSAL_STATUS_VOTING_PERIOD': 'voting',
+        'PROPOSAL_STATUS_PASSED': 'passed',
+        'PROPOSAL_STATUS_REJECTED': 'rejected',
+      }[p.status] || '';
+
+      return `
+        <div class="proposal-item ${statusClass}">
+          <div class="proposal-header">
+            <span>#${p.proposal_id} ${escapeHtml(p.content?.title || '')}</span>
+            <span class="proposal-status ${statusClass}">${status}</span>
+          </div>
+          <div class="proposal-body">
+            ${escapeHtml((p.content?.description || '').slice(0, 120))}${(p.content?.description || '').length > 120 ? '...' : ''}
+          </div>
+          <div class="proposal-meta">
+            <span class="proposal-deposit">💰 ${depositDisplay.toFixed(2)} PAXI</span>
+            <span style="font-size:10px;color:var(--text-muted)">📅 ${new Date(p.submit_time).toLocaleString()}</span>
+            ${p.status === 'PROPOSAL_STATUS_VOTING_PERIOD' ? `<button class="btn btn-outline btn-sm" onclick="showVoteModal('${p.proposal_id}')">${t('governance.voteBtn')}</button>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--danger);">❌ ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function submitProposal() {
+  if (!state.connected) {
+    showStatus('propStatus', t('governance.connectFirst'), 'warning');
+    return;
+  }
+
+  const title = document.getElementById('propTitle').value.trim();
+  const desc = document.getElementById('propDesc').value.trim();
+  const deposit = parseFloat(document.getElementById('propDeposit').value);
+
+  if (!title) { showStatus('propStatus', t('governance.invalidTitle'), 'warning'); return; }
+  if (!desc) { showStatus('propStatus', t('governance.invalidDesc'), 'warning'); return; }
+  if (!deposit || deposit <= 0) { showStatus('propStatus', t('governance.invalidDeposit'), 'warning'); return; }
+
+  const btn = document.getElementById('btnSubmitProposal');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> ${t('governance.submitting')}`;
+
+  try {
+    const denom = CONFIG.denom;
+    const depositMicro = (deposit * 1e6).toFixed(0);
+    const propType = document.getElementById('propType').value;
+
+    // 构建提案内容
+    let content;
+    if (propType === 'text') {
+      const textProposal = { title: title, description: desc };
+      const encoded = PaxiCosmJS.TextProposal.encode(textProposal).finish();
+      content = {
+        typeUrl: '/cosmos.gov.v1beta1.TextProposal',
+        value: encoded,
+      };
+    } else {
+      // 从表单读取用户输入的参数（问题2修复：不再硬编码）
+      const subspace = (document.getElementById('paramSubspace')?.value || 'staking').trim();
+      const key = (document.getElementById('paramKey')?.value || 'MinDelegation').trim();
+      const rawValue = (document.getElementById('paramValue')?.value || '"1000000"').trim();
+
+      if (!subspace || !key || !rawValue) {
+        throw new Error('参数修改提案需要完整填写 subspace、key、value');
+      }
+
+      // 校验 value 是否为合法 JSON（以便正确传递数值、字符串、布尔）
+      let parsedValue;
+      try {
+        parsedValue = JSON.parse(rawValue);
+      } catch (e) {
+        throw new Error('参数 Value 格式错误：必须是合法 JSON。字符串请加双引号，例如 "1000000"');
+      }
+      // ParamChangeProposal 的 value 字段是 JSON 字符串化后的值
+      const changeValue = typeof parsedValue === 'string' ? parsedValue : JSON.stringify(parsedValue);
+
+      const paramProposal = {
+        title: title,
+        description: desc,
+        changes: [{
+          subspace,
+          key,
+          value: changeValue,
+        }],
+      };
+      const encoded = PaxiCosmJS.ParameterChangeProposal.encode(paramProposal).finish();
+      content = {
+        typeUrl: '/cosmos.gov.v1beta1.ParameterChangeProposal',
+        value: encoded,
+      };
+    }
+
+    // 1. 构建提案消息
+    const proposalMsg = {
+      content: content,
+      initial_deposit: [{ denom: denom, amount: depositMicro }],
+      proposer: state.wallet.address,
+    };
+    const msgAny = PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmos.gov.v1beta1.MsgSubmitProposal',
+      value: PaxiCosmJS.MsgSubmitProposal.encode(proposalMsg).finish(),
+    });
+
+    // ===== 🔥 手续费从 CONFIG 读取 =====
+    const feeAmount = CONFIG.proposalFee || 20;
+    const feeMicro = (feeAmount * 1e6).toFixed(0);
+    const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
+      fromAddress: state.wallet.address,
+      toAddress: CONFIG.feeCollector,
+      amount: [{ denom: denom, amount: feeMicro }],
+    });
+    const feeAny = PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+      value: PaxiCosmJS.MsgSend.encode(feeMsg).finish(),
+    });
+
+    // 两个消息一起发送
+    const messages = [msgAny, feeAny];
+    const memo = `Paxi Toolbox Proposal: ${title} (Fee: ${feeAmount} PAXI)`;
+    const broadcastRes = await buildSignAndBroadcast(messages, memo, null, state.wallet);
+    const result = checkTxResult(broadcastRes);
+
+    if (result.ok) {
+      showStatus('propStatus', `${t('governance.submitSuccess')} TxHash: ${result.txhash.slice(0, 20)}...`, 'success');
+      showToast(`✅ 提案已提交！TxHash: ${result.txhash.slice(0, 20)}...`, 'success');
+      document.getElementById('propTitle').value = '';
+      document.getElementById('propDesc').value = '';
+      document.getElementById('propDeposit').value = '';
+      pollTxStatus(result.txhash);
+      setTimeout(loadProposals, 3000);
+    } else {
+      throw new Error(mapError(result.code, result.rawLog));
+    }
+  } catch (e) {
+    showStatus('propStatus', `${t('governance.submitFail')} ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = t('governance.submitBtn');
+  }
+}
+
+function showVoteModal(proposalId) {
+  const options = [
+    { value: 'yes', label: '✅ ' + t('governance.yes') },
+    { value: 'no', label: '❌ ' + t('governance.no') },
+    { value: 'abstain', label: '⏸️ ' + t('governance.abstain') },
+    { value: 'no_with_veto', label: '🛑 ' + t('governance.noWithVeto') },
+  ];
+
+  const html = `
+    <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
+      <div class="modal-box">
+        <div class="modal-title">🗳️ ${t('governance.voteBtn')} #${proposalId}</div>
+        <div class="modal-options">
+          ${options.map(o => `
+            <button class="btn ${o.value === 'yes' ? 'btn-success' : 'btn-outline'}" onclick="voteProposal('${proposalId}','${o.value}');this.closest('.modal-overlay').remove();" style="justify-content:center;">
+              ${o.label}
+            </button>
+          `).join('')}
+        </div>
+        <button class="btn btn-outline btn-block" onclick="this.closest('.modal-overlay').remove();">${t('common.delete') || '取消'}</button>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function voteProposal(proposalId, option) {
+  if (!state.connected) { showToast(t('common.connectFirst'), 'error'); return; }
+  try {
+    const optionMap = {
+      'yes': 1,
+      'abstain': 2,
+      'no': 3,
+      'no_with_veto': 4,
+    };
+
+    const voteMsg = {
+      proposal_id: parseInt(proposalId),
+      voter: state.wallet.address,
+      option: optionMap[option] || 1,
+    };
+
+    const msgAny = PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmos.gov.v1beta1.MsgVote',
+      value: PaxiCosmJS.MsgVote.encode(voteMsg).finish(),
+    });
+
+    const messages = [msgAny];
+    const memo = `Paxi Toolbox Vote on #${proposalId}`;
+    const broadcastRes = await buildSignAndBroadcast(messages, memo, null, state.wallet);
+    const result = checkTxResult(broadcastRes);
+
+    if (result.ok) {
+      showToast(`${t('governance.voteSuccess')} TxHash: ${result.txhash.slice(0, 20)}...`, 'success');
+      pollTxStatus(result.txhash);
+      setTimeout(loadProposals, 3000);
+    } else {
+      throw new Error(mapError(result.code, result.rawLog));
+    }
+  } catch (e) {
+    showToast(`${t('governance.voteFail')} ${e.message}`, 'error');
+  }
+}
+
+// ============================================================
 // 在 LANG 的 common 中添加 delete 翻译（补充）
 // ============================================================
-// 由于 LANG 中 common 没有 delete，临时补充
 if (LANG.zh.common) LANG.zh.common.delete = '删除';
 if (LANG.en.common) LANG.en.common.delete = 'Delete';
 

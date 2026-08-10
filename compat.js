@@ -83,7 +83,6 @@
         encodeLenDelim(1, fromAddress),
         encodeLenDelim(2, toAddress),
       ];
-      // amount 是 repeated Coin
       if (data.amount && data.amount.length > 0) {
         for (const coin of data.amount) {
           const coinBytes = encodeCoin(coin.denom, coin.amount);
@@ -340,6 +339,106 @@
   };
 
   // ============================================================
+  // 🔥 新增：MsgSubmitProposal 编码 — 提交治理提案
+  // protobuf: cosmos.gov.v1beta1.MsgSubmitProposal
+  // { google.protobuf.Any content = 1; repeated Coin initial_deposit = 2; string proposer = 3; }
+  // ============================================================
+  const MsgSubmitProposal = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const parts = [];
+      // 1. content (Any)
+      if (data.content) {
+        const contentBytes = AnyEncode.encode(data.content).finish();
+        parts.push(encodeLenDelim(1, contentBytes));
+      }
+      // 2. initial_deposit (repeated Coin)
+      if (data.initial_deposit && data.initial_deposit.length > 0) {
+        for (const coin of data.initial_deposit) {
+          const coinBytes = encodeCoin(coin.denom, coin.amount);
+          parts.push(encodeLenDelim(2, coinBytes));
+        }
+      }
+      // 3. proposer (string)
+      if (data.proposer) {
+        parts.push(encodeLenDelim(3, data.proposer));
+      }
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
+  // 🔥 新增：MsgVote 编码 — 投票
+  // protobuf: cosmos.gov.v1beta1.MsgVote
+  // { uint64 proposal_id = 1; string voter = 2; VoteOption option = 3; }
+  // VoteOption: 0=空, 1=Yes, 2=Abstain, 3=No, 4=NoWithVeto
+  // ============================================================
+  const MsgVote = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      return {
+        finish: () => concatBytes(
+          encodeVarintField(1, data.proposal_id),
+          encodeLenDelim(2, data.voter),
+          encodeVarintField(3, data.option || 1),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
+  // 🔥 新增：TextProposal 编码（提案内容）
+  // protobuf: cosmos.gov.v1beta1.TextProposal
+  // { string title = 1; string description = 2; }
+  // ============================================================
+  const TextProposal = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      return {
+        finish: () => concatBytes(
+          encodeLenDelim(1, data.title || ''),
+          encodeLenDelim(2, data.description || ''),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
+  // 🔥 新增：ParameterChangeProposal 编码（参数修改提案）
+  // protobuf: cosmos.gov.v1beta1.ParameterChangeProposal
+  // { string title = 1; string description = 2; repeated ParamChange changes = 3; }
+  // ParamChange: { string subspace = 1; string key = 2; string value = 3; }
+  // ============================================================
+  const ParamChange = {
+    encode(data) {
+      return {
+        finish: () => concatBytes(
+          encodeLenDelim(1, data.subspace || ''),
+          encodeLenDelim(2, data.key || ''),
+          encodeLenDelim(3, data.value || ''),
+        ),
+      };
+    },
+  };
+
+  const ParameterChangeProposal = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const parts = [
+        encodeLenDelim(1, data.title || ''),
+        encodeLenDelim(2, data.description || ''),
+      ];
+      if (data.changes && data.changes.length > 0) {
+        for (const change of data.changes) {
+          const changeBytes = ParamChange.encode(change).finish();
+          parts.push(encodeLenDelim(3, changeBytes));
+        }
+      }
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
   // 兼容层入口：检测并补充缺失的类
   // ============================================================
   function applyCompat() {
@@ -363,6 +462,11 @@
       MsgUpdateAdmin,
       MsgMigrateContract,
       MsgBeginRedelegate,
+      // 🔥 新增治理相关
+      MsgSubmitProposal,
+      MsgVote,
+      TextProposal,
+      ParameterChangeProposal,
     };
 
     let added = [];
