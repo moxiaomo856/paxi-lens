@@ -77,9 +77,11 @@
   const MsgSend = {
     fromPartial(data) { return data; },
     encode(data) {
+      const fromAddress = data.fromAddress || data.from_address;
+      const toAddress = data.toAddress || data.to_address;
       const parts = [
-        encodeLenDelim(1, data.fromAddress),
-        encodeLenDelim(2, data.toAddress),
+        encodeLenDelim(1, fromAddress),
+        encodeLenDelim(2, toAddress),
       ];
       // amount 是 repeated Coin
       if (data.amount && data.amount.length > 0) {
@@ -101,10 +103,13 @@
   const MsgExecuteContract = {
     fromPartial(data) { return data; },
     encode(data) {
+      const sender = data.sender || data.sender_address;
+      const contract = data.contract || data.contract_addr;
+      const msg = data.msg || new Uint8Array();
       const parts = [
-        encodeLenDelim(1, data.sender),
-        encodeLenDelim(2, data.contract),
-        encodeLenDelim(3, data.msg || new Uint8Array()),
+        encodeLenDelim(1, sender),
+        encodeLenDelim(2, contract),
+        encodeLenDelim(3, msg),
       ];
       if (data.funds && data.funds.length > 0) {
         for (const coin of data.funds) {
@@ -127,7 +132,7 @@
       const parts = [
         encodeLenDelim(1, data.sender),
         encodeLenDelim(2, data.admin || ''),
-        encodeVarintField(3, data.codeId || 0),
+        encodeVarintField(3, data.codeId || data.code_id || 0),
         encodeLenDelim(4, data.label || ''),
         encodeLenDelim(5, data.msg || new Uint8Array()),
       ];
@@ -310,6 +315,31 @@
   };
 
   // ============================================================
+  // MsgBeginRedelegate 编码 — 质押迁移
+  // protobuf: cosmos.staking.v1beta1.MsgBeginRedelegate
+  // { string delegator_address = 1; string validator_src_address = 2; string validator_dst_address = 3; Coin amount = 4; }
+  // 兼容 snake_case (app.js) 和 camelCase (SDK 风格) 两种字段名
+  // ============================================================
+  const MsgBeginRedelegate = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const delegatorAddress = data.delegator_address || data.delegatorAddress;
+      const validatorSrcAddress = data.validator_src_address || data.validatorSrcAddress;
+      const validatorDstAddress = data.validator_dst_address || data.validatorDstAddress;
+      const parts = [
+        encodeLenDelim(1, delegatorAddress),
+        encodeLenDelim(2, validatorSrcAddress),
+        encodeLenDelim(3, validatorDstAddress),
+      ];
+      if (data.amount) {
+        const coinBytes = encodeCoin(data.amount.denom, data.amount.amount);
+        parts.push(encodeLenDelim(4, coinBytes));
+      }
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
   // 兼容层入口：检测并补充缺失的类
   // ============================================================
   function applyCompat() {
@@ -332,6 +362,7 @@
       MsgRevoke,
       MsgUpdateAdmin,
       MsgMigrateContract,
+      MsgBeginRedelegate,
     };
 
     let added = [];

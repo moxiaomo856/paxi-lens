@@ -6,8 +6,9 @@ Paxi Network 生态工具集，纯前端部署，零服务器成本。
 
 ```
 paxi-toolbox/
-├── index.html              # 工具箱主页（7个工具）
+├── index.html              # 工具箱主页（11个工具）
 ├── app.js                  # 工具箱核心逻辑
+├── shared.js               # 公共模块（i18n / 状态 / 通用函数）
 ├── compat.js               # SDK 兼容层（补充 PaxiCosmJS 缺失的类）
 ├── nft-launcher/
 │   └── index.html          # PRC-721 NFT 发射平台
@@ -21,11 +22,15 @@ paxi-toolbox/
 |------|------|
 | 📤 批量转账 | PAXI/PRC-20/NFT 批量发送，CSV 导入，1.5% 手续费 |
 | 💰 余额查询 | 批量查询多地址余额，导出 CSV |
+| 🏪 NFT 市场 | 上架/浏览/购买/授权/导入（Authz 原子交换） |
 | 🔍 交易追踪 | 输入 TxHash 查询交易状态 |
-| ⛽ Gas 计算器 | 估算不同类型交易费用 |
+| 🎨 NFT 发射 | 独立页面，三步创建 NFT 合集 |
 | 🔄 地址转换 | Bech32 地址跨链前缀转换 |
+| 🔄 变更质押节点 | 质押从一个验证节点迁移到另一个 |
+| ⛽ Gas 计算器 | 估算不同类型交易费用 |
 | 🏦 验证节点对比 | 实时节点 APR、佣金率对比 |
-| 🪙 代币查询 | PRC-20 合约元数据查询 |
+| 📊 P2P 买卖市场 | 发布 PAXI 买单/卖单，分享码传播 |
+| 📌 后期开发 | 占位提示 |
 
 ## NFT 发射平台
 
@@ -73,10 +78,11 @@ git push origin main
 ## 技术栈
 
 - 纯 HTML/CSS/JavaScript（无框架依赖）
-- Paxi CosmJS SDK（链上交互）
+- PaxiCosmJS SDK（链上交互）
 - PaxiHub 钱包集成（签名交易）
 - Paxi LCD API（数据查询）
 - GitHub Pages（静态托管）
+- Authz 原子交换（NFT 市场成交机制）
 
 ## 技术文档
 

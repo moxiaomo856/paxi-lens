@@ -365,7 +365,7 @@ async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
   };
 
   // PubKey
-  const pubkeyBytes = new Uint8Array(pubKey);
+  const pubkeyBytes = typeof pubKey === 'string' ? fromBase64(pubKey) : new Uint8Array(pubKey);
   const pubkeyAny = {
     typeUrl: '/cosmos.crypto.secp256k1.PubKey',
     value: PaxiCosmJS.PubKey.encode({ key: pubkeyBytes }).finish(),
