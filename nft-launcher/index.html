@@ -187,75 +187,76 @@
   <div class="header-left">
     <div class="logo">N</div>
     <div>
-      <div class="header-title">Paxi NFT 发射平台</div>
-      <div style="font-size:11px;color:var(--text-muted)">PRC-721 · 一键发行 · 零代码</div>
+      <div class="header-title" data-i18n="appTitle">Paxi NFT 发射平台</div>
+      <div style="font-size:11px;color:var(--text-muted)" data-i18n="appSubtitle">PRC-721 · 一键发行 · 零代码</div>
     </div>
-    <span class="header-badge">正式版</span>
+    <span class="header-badge" data-i18n="appBadge">正式版</span>
   </div>
   <div class="wallet-area">
     <span class="wallet-address" id="walletAddress" style="display:none"></span>
-    <button class="btn btn-primary btn-sm" id="btnConnect" onclick="connectWallet()">🔌 连接</button>
-    <button class="btn btn-outline btn-sm" id="btnDisconnect" style="display:none" onclick="disconnectWallet()">断开</button>
+    <button class="btn btn-outline btn-sm" id="langBtn" onclick="toggleLanguage()" style="padding:6px 10px;min-height:32px;font-size:11px">中/En</button>
+    <button class="btn btn-primary btn-sm" id="btnConnect" onclick="connectWallet()" data-i18n="common.connect">🔌 连接</button>
+    <button class="btn btn-outline btn-sm" id="btnDisconnect" style="display:none" onclick="disconnectWallet()" data-i18n="common.disconnect">断开</button>
   </div>
 </header>
 
 <main class="main">
 
   <div class="card">
-    <div class="card-title">🎨 PRC-721 NFT 合集发射器</div>
-    <div class="card-desc">
+    <div class="card-title" data-i18n="step.title">🎨 PRC-721 NFT 合集发射器</div>
+    <div class="card-desc" data-i18n="step.desc">
       填写合集信息，一键部署 PRC-721 NFT 合约到 Paxi 网络。部署后可直接批量铸造 NFT。
     </div>
 
     <div class="steps">
       <div class="step active" id="step1">
-        <span class="step-num">1</span> 合集信息
+        <span class="step-num">1</span> <span data-i18n="step.s1">合集信息</span>
       </div>
       <span class="step-arrow">→</span>
       <div class="step" id="step2">
-        <span class="step-num">2</span> 上传素材
+        <span class="step-num">2</span> <span data-i18n="step.s2">上传素材</span>
       </div>
       <span class="step-arrow">→</span>
       <div class="step" id="step3">
-        <span class="step-num">3</span> 预览 & 部署
+        <span class="step-num">3</span> <span data-i18n="step.s3">预览 & 部署</span>
       </div>
     </div>
 
     <!-- Step 1: Collection Info -->
     <div id="panel-step1">
       <div class="form-group">
-        <label class="form-label">合集名称 *</label>
-        <input type="text" id="nftName" placeholder="例如：Paxi Punks" maxlength="50">
+        <label class="form-label" data-i18n="info.name">合集名称 *</label>
+        <input type="text" id="nftName" data-i18n-placeholder="info.namePh" placeholder="例如：Paxi Punks" maxlength="50">
       </div>
       <div class="form-group">
-        <label class="form-label">合集符号 *</label>
-        <input type="text" id="nftSymbol" placeholder="例如：PUNK" maxlength="20" style="text-transform:uppercase">
+        <label class="form-label" data-i18n="info.symbol">合集符号 *</label>
+        <input type="text" id="nftSymbol" data-i18n-placeholder="info.symbolPh" placeholder="例如：PUNK" maxlength="20" style="text-transform:uppercase">
       </div>
       <div class="form-group">
-        <label class="form-label">合集描述</label>
-        <textarea id="nftDescription" placeholder="描述你的 NFT 合集..." maxlength="500"></textarea>
+        <label class="form-label" data-i18n="info.desc">合集描述</label>
+        <textarea id="nftDescription" data-i18n-placeholder="info.descPh" placeholder="描述你的 NFT 合集..." maxlength="500"></textarea>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">最大供应量</label>
+          <label class="form-label" data-i18n="info.maxSupply">最大供应量</label>
           <input type="number" id="nftMaxSupply" placeholder="10000" min="1" value="2026">
         </div>
         <div class="form-group">
-          <label class="form-label">版税比例 (%)</label>
+          <label class="form-label" data-i18n="info.royalty">版税比例 (%)</label>
           <input type="number" id="nftRoyalty" placeholder="7.5" min="0" max="20" step="0.1" value="7.5">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Mint 价格 (PAXI)</label>
+          <label class="form-label" data-i18n="info.mintPrice">Mint 价格 (PAXI)</label>
           <input type="number" id="nftMintPrice" placeholder="10" min="0" step="0.01" value="0">
         </div>
         <div class="form-group">
-          <label class="form-label">每地址最大 Mint 数</label>
+          <label class="form-label" data-i18n="info.maxPerWallet">每地址最大 Mint 数</label>
           <input type="number" id="nftMaxPerWallet" placeholder="10" min="1" value="10">
         </div>
       </div>
-      <button class="btn btn-primary" onclick="goToStep(2)">
+      <button class="btn btn-primary" onclick="goToStep(2)" data-i18n="btn.nextUpload">
         下一步：上传素材 →
       </button>
     </div>
@@ -263,22 +264,22 @@
     <!-- Step 2: Upload Assets -->
     <div id="panel-step2" style="display:none">
       <div class="form-group">
-        <label class="form-label">NFT 封面图（仅用于本地预览，不存入链上）</label>
+        <label class="form-label" data-i18n="upload.coverLabel">NFT 封面图（仅用于本地预览，不存入链上）</label>
         <div class="upload-area" id="uploadCover" onclick="document.getElementById('fileCover').click()">
           <div style="font-size:32px;margin-bottom:8px">🖼️</div>
-          <div>点击上传封面图</div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">支持 JPG/PNG/GIF/SVG</div>
+          <div data-i18n="upload.clickCover">点击上传封面图</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px" data-i18n="upload.coverFormat">支持 JPG/PNG/GIF/SVG</div>
           <img id="coverPreview" class="upload-preview">
         </div>
         <input type="file" id="fileCover" accept="image/*" style="display:none">
       </div>
       <div class="form-group">
-        <label class="form-label">图片 IPFS/Arweave URI（可选，测试中可不填）</label>
+        <label class="form-label" data-i18n="upload.uriLabel">图片 IPFS/Arweave URI（可选，测试中可不填）</label>
         <input type="text" id="nftImageUri" placeholder="https://...">
       </div>
       <div style="display:flex;gap:12px">
-        <button class="btn btn-outline" onclick="goToStep(1)">← 上一步</button>
-        <button class="btn btn-primary" onclick="goToStep(3)">下一步：预览 & 部署 →</button>
+        <button class="btn btn-outline" onclick="goToStep(1)" data-i18n="btn.prev">← 上一步</button>
+        <button class="btn btn-primary" onclick="goToStep(3)" data-i18n="btn.nextPreview">下一步：预览 & 部署 →</button>
       </div>
     </div>
 
@@ -292,7 +293,7 @@
         <p id="previewDesc" style="font-size:12px;color:var(--text-muted);margin-top:4px">-</p>
       </div>
       <div style="margin-top:20px">
-        <button class="btn btn-success" id="btnDeploy" onclick="deployNFTContract()">
+        <button class="btn btn-success" id="btnDeploy" onclick="deployNFTContract()" data-i18n="btn.deploy">
           🚀 部署 NFT 合约
         </button>
       </div>
@@ -303,38 +304,38 @@
 
   <!-- 批量铸造 -->
   <div class="card">
-    <div class="card-title">🏭 批量铸造 NFT</div>
-    <div class="card-desc">
+    <div class="card-title" data-i18n="mint.title">🏭 批量铸造 NFT</div>
+    <div class="card-desc" data-i18n="mint.desc">
       向已部署的 PRC-721 合约批量铸造 NFT。单次最多铸造 10 个，每个 NFT 将生成唯一 Token ID。
     </div>
 
     <div class="form-group">
-      <label class="form-label">NFT 合约地址 * (生成后自动填入)</label>
+      <label class="form-label" data-i18n="mint.contractLabel">NFT 合约地址 * (生成后自动填入)</label>
       <input type="text" id="mintContractAddr" placeholder="paxi1...">
     </div>
 
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">铸造数量 *</label>
-        <input type="number" id="mintCount" placeholder="例如：5" min="1" max="10" value="5">
+        <label class="form-label" data-i18n="mint.countLabel">铸造数量 *</label>
+        <input type="number" id="mintCount" data-i18n-placeholder="mint.countPh" placeholder="例如：5" min="1" max="10" value="5">
       </div>
     </div>
 
     <div id="mintFeePreview" style="display:none;margin-bottom:16px">
       <div style="background:var(--bg);border-radius:8px;padding:14px 18px;font-size:13px">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <span style="color:var(--text-muted)">铸造数量</span>
+          <span style="color:var(--text-muted)" data-i18n="mint.previewCount">铸造数量</span>
           <span id="mfCount">-</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border);font-weight:700">
-          <span>预计费用</span>
+          <span data-i18n="mint.previewFee">预计费用</span>
           <span id="mfTotal" style="color:var(--success)">-</span>
         </div>
       </div>
     </div>
 
-    <button class="btn btn-primary" onclick="previewMintFee()">💰 预估费用</button>
-    <button class="btn btn-success" id="btnBatchMint" style="display:none" onclick="executeBatchMint()">
+    <button class="btn btn-primary" onclick="previewMintFee()" data-i18n="btn.estimate">💰 预估费用</button>
+    <button class="btn btn-success" id="btnBatchMint" style="display:none" onclick="executeBatchMint()" data-i18n="btn.batchMint">
       🏭 执行批量铸造
     </button>
     <div class="status-msg" id="mintStatus"></div>
@@ -342,27 +343,27 @@
 
   <!-- 自定义元数据存储 -->
   <div class="card">
-    <div class="card-title">📝 自定义元数据存储</div>
-    <div class="card-desc">为已铸造的 NFT 添加自定义名称和图片。</div>
+    <div class="card-title" data-i18n="meta.title">📝 自定义元数据存储</div>
+    <div class="card-desc" data-i18n="meta.desc">为已铸造的 NFT 添加自定义名称和图片。</div>
     <div class="form-group">
-      <label class="form-label">NFT 合约地址 *</label>
+      <label class="form-label" data-i18n="meta.contractLabel">NFT 合约地址 *</label>
       <input type="text" id="metaContractAddr" placeholder="paxi1...">
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Token ID *</label>
-        <input type="text" id="metaTokenId" placeholder="例如：1">
+        <label class="form-label" data-i18n="meta.tokenIdLabel">Token ID *</label>
+        <input type="text" id="metaTokenId" data-i18n-placeholder="meta.tokenIdPh" placeholder="例如：1">
       </div>
       <div class="form-group">
-        <label class="form-label">NFT 名称</label>
-        <input type="text" id="metaName" placeholder="例如：Paxi Punk #1">
+        <label class="form-label" data-i18n="meta.nameLabel">NFT 名称</label>
+        <input type="text" id="metaName" data-i18n-placeholder="meta.namePh" placeholder="例如：Paxi Punk #1">
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">图片 URI</label>
+      <label class="form-label" data-i18n="meta.imageLabel">图片 URI</label>
       <input type="text" id="metaImage" placeholder="https://...">
     </div>
-    <button class="btn btn-primary" onclick="executeMetadataUpdate()">
+    <button class="btn btn-primary" onclick="executeMetadataUpdate()" data-i18n="btn.storeMeta">
       📝 存储元数据
     </button>
     <div class="status-msg" id="metaStatus"></div>
@@ -370,24 +371,294 @@
 
   <!-- 已部署的合约 -->
   <div class="card">
-    <div class="card-title">📜 已部署的合约</div>
-    <div class="card-desc">已成功部署到 Paxi 链上的 NFT 合约记录。</div>
+    <div class="card-title" data-i18n="list.title">📜 已部署的合约</div>
+    <div class="card-desc" data-i18n="list.desc">已成功部署到 Paxi 链上的 NFT 合约记录。</div>
     <div id="deployedContracts">
-      <p style="color:var(--text-muted);font-size:13px">暂无已部署的合约</p>
+      <p style="color:var(--text-muted);font-size:13px" data-i18n="list.empty">暂无已部署的合约</p>
     </div>
   </div>
 </main>
 
 <div class="bottom-bar">
-  <a href="../index.html" class="btn btn-outline" style="text-decoration:none;color:var(--text)">
+  <a href="../index.html" class="btn btn-outline" style="text-decoration:none;color:var(--text)" data-i18n="btn.backHome">
     ← 返回工具箱
   </a>
 </div>
 
-<script src="https://mainnet-api.paxinet.io/resources/js/paxi-cosmjs.umd.js"></script>
+<script src="https://mainnet-api.paxinet.io/resources/js/paxi-cosmjs.umd.js"
+  async
+  onerror="console.warn('[SDK] paxi-cosmjs CDN failed');">
+</script>
 <script src="../shared.js"></script>
 <script src="../compat.js"></script>
 <script>
+// ============================================================
+// 多语言（zh/en）
+// ============================================================
+const LANG = {
+  zh: {
+    appTitle: 'Paxi NFT 发射平台',
+    appSubtitle: 'PRC-721 · 一键发行 · 零代码',
+    appBadge: '正式版',
+    common: {
+      connect: '🔌 连接',
+      disconnect: '断开',
+    },
+    step: {
+      title: '🎨 PRC-721 NFT 合集发射器',
+      desc: '填写合集信息，一键部署 PRC-721 NFT 合约到 Paxi 网络。部署后可直接批量铸造 NFT。',
+      s1: '合集信息',
+      s2: '上传素材',
+      s3: '预览 & 部署',
+    },
+    info: {
+      name: '合集名称 *',
+      namePh: '例如：Paxi Punks',
+      symbol: '合集符号 *',
+      symbolPh: '例如：PUNK',
+      desc: '合集描述',
+      descPh: '描述你的 NFT 合集...',
+      maxSupply: '最大供应量',
+      royalty: '版税比例 (%)',
+      mintPrice: 'Mint 价格 (PAXI)',
+      maxPerWallet: '每地址最大 Mint 数',
+    },
+    upload: {
+      coverLabel: 'NFT 封面图（仅用于本地预览，不存入链上）',
+      clickCover: '点击上传封面图',
+      coverFormat: '支持 JPG/PNG/GIF/SVG',
+      uriLabel: '图片 IPFS/Arweave URI（可选，测试中可不填）',
+    },
+    mint: {
+      title: '🏭 批量铸造 NFT',
+      desc: '向已部署的 PRC-721 合约批量铸造 NFT。单次最多铸造 10 个，每个 NFT 将生成唯一 Token ID。',
+      contractLabel: 'NFT 合约地址 * (生成后自动填入)',
+      countLabel: '铸造数量 *',
+      countPh: '例如：5',
+      previewCount: '铸造数量',
+      previewFee: '预计费用',
+      mintCountPh: ' 枚',
+      mintFeeSuf: ' PAXI (平台费) + 少量 Gas',
+    },
+    meta: {
+      title: '📝 自定义元数据存储',
+      desc: '为已铸造的 NFT 添加自定义名称和图片。',
+      contractLabel: 'NFT 合约地址 *',
+      tokenIdLabel: 'Token ID *',
+      tokenIdPh: '例如：1',
+      nameLabel: 'NFT 名称',
+      namePh: '例如：Paxi Punk #1',
+      imageLabel: '图片 URI',
+    },
+    list: {
+      title: '📜 已部署的合约',
+      desc: '已成功部署到 Paxi 链上的 NFT 合约记录。',
+      empty: '暂无已部署的合约',
+      addrLabel: '合约地址：',
+    },
+    btn: {
+      prev: '← 上一步',
+      nextUpload: '下一步：上传素材 →',
+      nextPreview: '下一步：预览 & 部署 →',
+      deploy: '🚀 部署 NFT 合约',
+      estimate: '💰 预估费用',
+      batchMint: '🏭 执行批量铸造',
+      storeMeta: '📝 存储元数据',
+      backHome: '← 返回工具箱',
+      buildDeployTx: '<span class="spinner"></span> 构建部署交易...',
+      buildMintTx: '<span class="spinner"></span> 构建铸造交易...',
+      waitSign: '<span class="spinner"></span> 等待钱包签名...',
+      waitConfirm: '<span class="spinner"></span> 等待上链确认...',
+      copyJson: '📋 复制 JSON',
+    },
+    msg: {
+      installWallet: '请先安装 PaxiHub 钱包',
+      walletConnected: '钱包已连接',
+      connectFailed: '连接失败：',
+      fillNameSymbol: '请填写合集名称和符号',
+      connectFirst: '请先连接钱包',
+      fillContractAddr: '请输入合约地址',
+      fillMintCount: '请输入铸造数量',
+      mintMax10: '单次最多铸造 10 个 NFT',
+      fillContractAndCount: '请填写合约地址和铸造数量',
+      broadcastFail: '交易广播失败',
+      mintRequest: '⏳ 已提交 {count} 个 NFT 铸造请求',
+      txHash: 'TxHash: ',
+      deploySuccess: '✅ NFT 合约部署成功！',
+      collectionName: '合集名称：',
+      contractAddr: '合约地址：',
+      txHashLabel: 'TxHash：',
+      nextStep: '👇 下一步：复制上方地址，粘贴到下方的【批量铸造】输入框中',
+      contractNotFound: '无法从交易中提取合约地址，请手动查看区块浏览器',
+      deployFailed: '部署失败',
+      mintSuccess: '✅ 成功铸造 {count} 个 NFT！',
+      blockHeight: '区块高度:',
+      mintFailed: '铸造失败',
+      deployPolling: '⏳ 交易已广播，等待上链确认...',
+      jsonReady: '✅ 元数据 JSON 已生成',
+      jsonDesc: 'PRC-721 通过 token_uri 指向外部 JSON 管理元数据。请将以下 JSON 上传到你的服务器或 IPFS，然后在铸造时使用该 URL 作为 token_uri。',
+      copied: '已复制',
+      jsonCopied: '元数据 JSON 已生成',
+      deploySuccessToast: '部署成功',
+      mintSuccessToast: '成功铸造 {count} 个 NFT',
+      timeout: '交易上链超时',
+      deployBroadcastFail: '部署广播失败，未获取到交易哈希',
+    },
+  },
+  en: {
+    appTitle: 'Paxi NFT Launcher',
+    appSubtitle: 'PRC-721 · One-Click Mint · Zero Code',
+    appBadge: 'Release',
+    common: {
+      connect: '🔌 Connect',
+      disconnect: 'Disconnect',
+    },
+    step: {
+      title: '🎨 PRC-721 NFT Collection Launcher',
+      desc: 'Fill in collection info and deploy a PRC-721 NFT contract to Paxi network in one click. Batch mint after deployment.',
+      s1: 'Info',
+      s2: 'Assets',
+      s3: 'Preview & Deploy',
+    },
+    info: {
+      name: 'Collection Name *',
+      namePh: 'e.g. Paxi Punks',
+      symbol: 'Collection Symbol *',
+      symbolPh: 'e.g. PUNK',
+      desc: 'Description',
+      descPh: 'Describe your NFT collection...',
+      maxSupply: 'Max Supply',
+      royalty: 'Royalty (%)',
+      mintPrice: 'Mint Price (PAXI)',
+      maxPerWallet: 'Max Mint Per Wallet',
+    },
+    upload: {
+      coverLabel: 'NFT Cover Image (local preview only, not on-chain)',
+      clickCover: 'Click to upload cover',
+      coverFormat: 'JPG / PNG / GIF / SVG supported',
+      uriLabel: 'Image IPFS / Arweave URI (optional)',
+    },
+    mint: {
+      title: '🏭 Batch Mint NFT',
+      desc: 'Batch mint NFTs to a deployed PRC-721 contract. Up to 10 NFTs per transaction. Each NFT gets a unique Token ID.',
+      contractLabel: 'NFT Contract Address * (auto-filled after deploy)',
+      countLabel: 'Mint Amount *',
+      countPh: 'e.g. 5',
+      previewCount: 'Mint Amount',
+      previewFee: 'Est. Fee',
+      mintCountPh: ' pcs',
+      mintFeeSuf: ' PAXI (platform fee) + small Gas',
+    },
+    meta: {
+      title: '📝 Custom Metadata Store',
+      desc: 'Add custom name and image to minted NFTs.',
+      contractLabel: 'NFT Contract Address *',
+      tokenIdLabel: 'Token ID *',
+      tokenIdPh: 'e.g. 1',
+      nameLabel: 'NFT Name',
+      namePh: 'e.g. Paxi Punk #1',
+      imageLabel: 'Image URI',
+    },
+    list: {
+      title: '📜 Deployed Contracts',
+      desc: 'List of NFT contracts deployed on the Paxi blockchain.',
+      empty: 'No deployed contracts yet',
+      addrLabel: 'Contract: ',
+    },
+    btn: {
+      prev: '← Back',
+      nextUpload: 'Next: Upload Assets →',
+      nextPreview: 'Next: Preview & Deploy →',
+      deploy: '🚀 Deploy NFT Contract',
+      estimate: '💰 Estimate Fee',
+      batchMint: '🏭 Run Batch Mint',
+      storeMeta: '📝 Save Metadata',
+      backHome: '← Back to Toolbox',
+      buildDeployTx: '<span class="spinner"></span> Building deploy tx...',
+      buildMintTx: '<span class="spinner"></span> Building mint tx...',
+      waitSign: '<span class="spinner"></span> Waiting for wallet sign...',
+      waitConfirm: '<span class="spinner"></span> Waiting for chain confirm...',
+      copyJson: '📋 Copy JSON',
+    },
+    msg: {
+      installWallet: 'Please install PaxiHub Wallet first',
+      walletConnected: 'Wallet connected',
+      connectFailed: 'Connect failed: ',
+      fillNameSymbol: 'Please fill in collection name and symbol',
+      connectFirst: 'Please connect wallet first',
+      fillContractAddr: 'Please enter contract address',
+      fillMintCount: 'Please enter mint amount',
+      mintMax10: 'Maximum 10 NFTs per tx',
+      fillContractAndCount: 'Please fill contract address and mint amount',
+      broadcastFail: 'Broadcast failed',
+      mintRequest: '⏳ Submitted {count} mint request(s)',
+      txHash: 'TxHash: ',
+      deploySuccess: '✅ NFT contract deployed successfully!',
+      collectionName: 'Name: ',
+      contractAddr: 'Contract: ',
+      txHashLabel: 'TxHash: ',
+      nextStep: '👇 Next: Copy the address above into the batch mint input field',
+      contractNotFound: 'Cannot extract contract address, please check explorer',
+      deployFailed: 'Deploy failed',
+      mintSuccess: '✅ Successfully minted {count} NFT(s)!',
+      blockHeight: 'Block height:',
+      mintFailed: 'Mint failed',
+      deployPolling: '⏳ Tx broadcasted, waiting for chain confirm...',
+      jsonReady: '✅ Metadata JSON generated',
+      jsonDesc: 'PRC-721 manages metadata via token_uri pointing to external JSON. Please host the JSON below on your server or IPFS, then use that URL as token_uri when minting.',
+      copied: 'Copied',
+      jsonCopied: 'Metadata JSON generated',
+      deploySuccessToast: 'Deployed',
+      mintSuccessToast: 'Minted {count} NFT(s)',
+      timeout: 'Chain timeout',
+      deployBroadcastFail: 'Broadcast failed: no tx hash',
+    },
+  }
+};
+
+let nftLauncherLang = localStorage.getItem('paxi_nft_lang') || 'zh';
+function t(key) {
+  const keys = key.split('.');
+  let obj = LANG[nftLauncherLang];
+  for (const k of keys) {
+    if (obj && obj[k] !== undefined) obj = obj[k];
+    else return LANG.zh && LANG.zh[key] !== undefined ? ((o)=>{ for(const k of key.split('.')) o = o?.[k]; return o; })(LANG.zh) : key;
+  }
+  return obj || key;
+}
+// 占位符替换：tpl('msg.foo', { count: 5 })  把 {count} 替换为 5
+function tpl(key, vars) {
+  let s = t(key);
+  if (!vars) return s;
+  for (const k in vars) s = s.replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
+  return s;
+}
+function applyI18n() {
+  // 替换所有带 data-i18n 的 innerHTML / textContent
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const val = t(key);
+    el.innerHTML = val;
+  });
+  // 替换所有带 data-i18n-placeholder 的 placeholder
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    el.setAttribute('placeholder', t(key));
+  });
+  // 更新 header lang 按钮文字
+  const btn = document.getElementById('langBtn');
+  if (btn) btn.textContent = nftLauncherLang === 'zh' ? '中/En' : 'En/中';
+  // 更新浏览器 title
+  document.title = t('appTitle');
+}
+function toggleLanguage() {
+  nftLauncherLang = nftLauncherLang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('paxi_nft_lang', nftLauncherLang);
+  applyI18n();
+  // 重新渲染动态生成的卡片（已部署合约列表）
+  renderDeployedContracts();
+}
+
 // ============================================================
 // 配置
 // ============================================================
@@ -409,7 +680,7 @@ let deployedList = JSON.parse(localStorage.getItem('paxi_nft_deployed') || '[]')
 
 async function connectWallet() {
   if (typeof window.paxihub === 'undefined') {
-    showToast('请先安装 PaxiHub 钱包');
+    showToast(t('msg.installWallet'));
     return;
   }
   try {
@@ -418,9 +689,9 @@ async function connectWallet() {
     walletState.address = sender.address;
     walletState.publicKey = sender.public_key;
     updateWalletUI();
-    showToast('钱包已连接', 'success');
+    showToast(t('msg.walletConnected'), 'success');
   } catch (e) {
-    showToast('连接失败：' + e.message, 'error');
+    showToast(t('msg.connectFailed') + e.message, 'error');
   }
 }
 
@@ -450,7 +721,7 @@ function goToStep(step) {
     const name = document.getElementById('nftName').value.trim();
     const symbol = document.getElementById('nftSymbol').value.trim();
     if (!name || !symbol) {
-      showToast('请填写合集名称和符号', 'error');
+      showToast(t('msg.fillNameSymbol'), 'error');
       return;
     }
   }
@@ -511,7 +782,7 @@ async function pollTxResult(txhash, maxAttempts = 30, intervalMs = 3000) {
     } catch (e) {}
     await new Promise(r => setTimeout(r, intervalMs));
   }
-  return { success: false, code: -1, raw_log: '交易上链超时' };
+  return { success: false, code: -1, raw_log: t('msg.timeout') };
 }
 
 function extractContractAddress(broadcastRes) {
@@ -532,25 +803,24 @@ function extractContractAddress(broadcastRes) {
 // ============================================================
 async function deployNFTContract() {
   if (!walletState.connected) {
-    showToast('请先连接钱包', 'error');
+    showToast(t('msg.connectFirst'), 'error');
     return;
   }
   
   const name = document.getElementById('nftName').value.trim();
   const symbol = document.getElementById('nftSymbol').value.trim();
   if (!name || !symbol) {
-    showToast('请填写合集名称和符号', 'error');
+    showToast(t('msg.fillNameSymbol'), 'error');
     return;
   }
 
   const btn = document.getElementById('btnDeploy');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> 构建部署交易...';
+  btn.innerHTML = t('btn.buildDeployTx');
 
   const statusEl = document.getElementById('deployStatus');
   try {
     // PRC-721 标准 InstantiateMsg
-    // { "name": "MyNFTCollection", "symbol": "MNFT", "minter": "paxi1..." }
     const initMsg = JSON.stringify({
       name: name,
       symbol: symbol,
@@ -575,38 +845,38 @@ async function deployNFTContract() {
       value: PaxiCosmJS.MsgInstantiateContract.encode(instantiateMsg).finish(),
     })];
 
-    btn.innerHTML = '<span class="spinner"></span> 等待钱包签名...';
+    btn.innerHTML = t('btn.waitSign');
     const memo = `Deploy PRC-721: ${name} (${symbol})`;
     const res = await buildSignAndBroadcast(messages, memo, null, walletState);
 
     const txHash = res?.tx_response?.txhash;
-    if (!txHash) throw new Error('部署广播失败，未获取到交易哈希');
+    if (!txHash) throw new Error(t('msg.deployBroadcastFail'));
 
     statusEl.className = 'status-msg info';
     statusEl.style.display = 'block';
     statusEl.innerHTML = `
-      <strong>⏳ 交易已广播，等待上链确认...</strong><br>
-      <span style="font-size:12px">TxHash: <code>${escapeHtml(txHash)}</code></span>
+      <strong>${t('msg.deployPolling')}</strong><br>
+      <span style="font-size:12px">${t('msg.txHash')}<code>${escapeHtml(txHash)}</code></span>
     `;
 
     // 轮询交易结果
     const pollRes = await pollTxResult(txHash);
     if (!pollRes.success) {
-      throw new Error(`部署失败：${pollRes.raw_log || '未知错误'}`);
+      throw new Error(`${t('msg.deployFailed')}: ${pollRes.raw_log || ''}`);
     }
 
     // 从交易事件中提取合约地址
     const contractAddr = extractContractAddress(res);
-    if (!contractAddr) throw new Error('无法从交易中提取合约地址，请手动查看区块浏览器');
+    if (!contractAddr) throw new Error(t('msg.contractNotFound'));
 
     statusEl.className = 'status-msg success';
     statusEl.style.display = 'block';
     statusEl.innerHTML = `
-      <strong>✅ NFT 合约部署成功！</strong><br><br>
-      <strong>合集名称：</strong>${escapeHtml(name)}<br>
-      <strong>合约地址：</strong><code style="word-break:break-all;color:var(--primary)">${escapeHtml(contractAddr)}</code><br>
-      <strong>TxHash：</strong><code style="word-break:break-all;font-size:11px">${escapeHtml(txHash)}</code><br><br>
-      <strong>👇 下一步：</strong>复制上方地址，粘贴到下方的【批量铸造】输入框中
+      <strong>${t('msg.deploySuccess')}</strong><br><br>
+      <strong>${t('msg.collectionName')}</strong>${escapeHtml(name)}<br>
+      <strong>${t('msg.contractAddr')}</strong><code style="word-break:break-all;color:var(--primary)">${escapeHtml(contractAddr)}</code><br>
+      <strong>${t('msg.txHashLabel')}</strong><code style="word-break:break-all;font-size:11px">${escapeHtml(txHash)}</code><br><br>
+      <strong>${t('msg.nextStep')}</strong>
     `;
 
     document.getElementById('mintContractAddr').value = contractAddr;
@@ -616,15 +886,15 @@ async function deployNFTContract() {
     const mintPrice = parseFloat(document.getElementById('nftMintPrice').value) || 0;
     saveDeploymentRecord(name, symbol, maxSupply, royalty, mintPrice, contractAddr);
 
-    showToast('部署成功', 'success');
+    showToast(t('msg.deploySuccessToast'), 'success');
   } catch (e) {
     statusEl.className = 'status-msg error';
     statusEl.style.display = 'block';
-    statusEl.innerHTML = `<strong>❌ 部署失败</strong><br>${escapeHtml(e.message)}`;
-    showToast('部署失败', 'error');
+    statusEl.innerHTML = `<strong>❌ ${t('msg.deployFailed')}</strong><br>${escapeHtml(e.message)}`;
+    showToast(t('msg.deployFailed'), 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '🚀 部署 NFT 合约';
+    btn.innerHTML = t('btn.deploy');
   }
 }
 
@@ -637,13 +907,13 @@ function saveDeploymentRecord(name, symbol, maxSupply, royalty, mintPrice, contr
 function renderDeployedContracts() {
   const container = document.getElementById('deployedContracts');
   if (deployedList.length === 0) {
-    container.innerHTML = '<p style="color:var(--text-muted);font-size:13px">暂无已部署的合约</p>';
+    container.innerHTML = `<p style="color:var(--text-muted);font-size:13px">${t('list.empty')}</p>`;
     return;
   }
   container.innerHTML = deployedList.map(c => `
     <div style="background:var(--bg);border-radius:8px;padding:14px 18px;margin-bottom:8px;border:1px solid var(--border)">
       <strong>${escapeHtml(c.name)}</strong> (${escapeHtml(c.symbol)})
-      <div style="font-size:11px;color:var(--text-muted)">合约地址：<code style="word-break:break-all;color:var(--success)">${escapeHtml(c.contractAddr)}</code></div>
+      <div style="font-size:11px;color:var(--text-muted)">${t('list.addrLabel')}<code style="word-break:break-all;color:var(--success)">${escapeHtml(c.contractAddr)}</code></div>
     </div>
   `).join('');
 }
@@ -654,12 +924,12 @@ function renderDeployedContracts() {
 function previewMintFee() {
   const contractAddr = document.getElementById('mintContractAddr').value.trim();
   const count = parseInt(document.getElementById('mintCount').value) || 0;
-  if (!contractAddr) return showToast('请输入合约地址', 'error');
-  if (count < 1) return showToast('请输入铸造数量', 'error');
+  if (!contractAddr) return showToast(t('msg.fillContractAddr'), 'error');
+  if (count < 1) return showToast(t('msg.fillMintCount'), 'error');
   
   const totalFee = (CONFIG.batchMintFee * count).toFixed(2);
-  document.getElementById('mfCount').textContent = count + ' 枚';
-  document.getElementById('mfTotal').textContent = `${totalFee} PAXI (平台费) + 少量 Gas`;
+  document.getElementById('mfCount').textContent = count + t('mint.mintCountPh');
+  document.getElementById('mfTotal').textContent = totalFee + t('mint.mintFeeSuf');
   document.getElementById('mintFeePreview').style.display = 'block';
   document.getElementById('btnBatchMint').style.display = 'inline-flex';
 }
@@ -668,24 +938,23 @@ function previewMintFee() {
 // 批量铸造
 // ============================================================
 async function executeBatchMint() {
-  if (!walletState.connected) return showToast('请先连接钱包', 'error');
+  if (!walletState.connected) return showToast(t('msg.connectFirst'), 'error');
 
   const contractAddr = document.getElementById('mintContractAddr').value.trim();
   const count = parseInt(document.getElementById('mintCount').value) || 0;
-  if (!contractAddr || count < 1) return showToast('请填写合约地址和铸造数量', 'error');
-  if (count > 10) return showToast('单次最多铸造 10 个 NFT', 'error');
+  if (!contractAddr || count < 1) return showToast(t('msg.fillContractAndCount'), 'error');
+  if (count > 10) return showToast(t('msg.mintMax10'), 'error');
 
   const btn = document.getElementById('btnBatchMint');
   const statusEl = document.getElementById('mintStatus');
   
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> 构建铸造交易...';
+  btn.innerHTML = t('btn.buildMintTx');
 
   try {
     const messages = [];
     const timestamp = Date.now();
 
-    // 为每个 NFT 创建独立的 mint 消息
     for (let i = 0; i < count; i++) {
       const tokenId = `${timestamp}_${i}`;
       const mintMsg = {
@@ -709,7 +978,6 @@ async function executeBatchMint() {
       }));
     }
 
-    // 加平台费消息 (固定 5 PAXI)
     const feeMicro = paxiToUpaxi(CONFIG.batchMintFee.toFixed(6));
     const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
       fromAddress: walletState.address,
@@ -721,47 +989,46 @@ async function executeBatchMint() {
       value: PaxiCosmJS.MsgSend.encode(feeMsg).finish(),
     }));
 
-    btn.innerHTML = '<span class="spinner"></span> 等待钱包签名...';
+    btn.innerHTML = t('btn.waitSign');
     const memo = `Mint ${count} PRC-721 NFTs`;
     const broadcastRes = await buildSignAndBroadcast(messages, memo, null, walletState);
 
     const txHash = broadcastRes?.tx_response?.txhash;
-    if (!txHash) throw new Error('交易广播失败');
+    if (!txHash) throw new Error(t('msg.broadcastFail'));
 
     statusEl.className = 'status-msg info';
     statusEl.style.display = 'block';
     statusEl.innerHTML = `
-      <strong>⏳ 已提交 ${count} 个 NFT 铸造请求</strong><br>
-      <span style="font-size:12px">TxHash: <code>${escapeHtml(txHash)}</code></span>
+      <strong>${tpl('msg.mintRequest', { count })}</strong><br>
+      <span style="font-size:12px">${t('msg.txHash')}<code>${escapeHtml(txHash)}</code></span>
     `;
 
-    // 等待上链确认
-    btn.innerHTML = '<span class="spinner"></span> 等待上链确认...';
+    btn.innerHTML = t('btn.waitConfirm');
     const pollRes = await pollTxResult(txHash);
     if (!pollRes.success) {
-      throw new Error(`铸造失败：${pollRes.raw_log || '链上执行错误'}`);
+      throw new Error(`${t('msg.mintFailed')}: ${pollRes.raw_log || ''}`);
     }
 
     statusEl.className = 'status-msg success';
     statusEl.style.display = 'block';
     statusEl.innerHTML = `
-      <strong>✅ 成功铸造 ${count} 个 NFT！</strong><br>
+      <strong>${tpl('msg.mintSuccess', { count })}</strong><br>
       <strong>Token IDs:</strong> 
       <code style="word-break:break-all;font-size:11px">
         ${Array.from({ length: count }, (_, i) => `${timestamp}_${i}`).join(', ')}
       </code><br>
       <strong>TxHash:</strong> <code style="word-break:break-all;font-size:11px">${escapeHtml(txHash)}</code><br>
-      <strong>区块高度:</strong> ${pollRes.height}
+      <strong>${t('msg.blockHeight')}</strong> ${pollRes.height}
     `;
-    showToast(`成功铸造 ${count} 个 NFT`, 'success');
+    showToast(tpl('msg.mintSuccessToast', { count }), 'success');
   } catch (e) {
     statusEl.className = 'status-msg error';
     statusEl.style.display = 'block';
-    statusEl.innerHTML = `<strong>❌ 铸造失败</strong><br>${escapeHtml(e.message)}`;
-    showToast('铸造失败', 'error');
+    statusEl.innerHTML = `<strong>❌ ${t('msg.mintFailed')}</strong><br>${escapeHtml(e.message)}`;
+    showToast(t('msg.mintFailed'), 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '🏭 执行批量铸造';
+    btn.innerHTML = t('btn.batchMint');
   }
 }
 
@@ -773,14 +1040,13 @@ async function executeBatchMint() {
 async function executeMetadataUpdate() {
   const contractAddr = document.getElementById('metaContractAddr').value.trim();
   const tokenId = document.getElementById('metaTokenId').value.trim();
-  if (!contractAddr || !tokenId) return showToast('请填写合约地址和 Token ID', 'error');
+  if (!contractAddr || !tokenId) return showToast(t('msg.fillContractAndCount'), 'error');
 
   const name = document.getElementById('metaName').value.trim();
   const image = document.getElementById('metaImage').value.trim();
 
   const statusEl = document.getElementById('metaStatus');
 
-  // 生成符合 CW721 标准的元数据 JSON
   const metadata = {
     name: name || `NFT #${tokenId}`,
     image: image || '',
@@ -792,12 +1058,12 @@ async function executeMetadataUpdate() {
   statusEl.className = 'status-msg success';
   statusEl.style.display = 'block';
   statusEl.innerHTML = `
-    <strong>✅ 元数据 JSON 已生成</strong><br><br>
-    <span style="font-size:12px;color:var(--text-muted)">PRC-721 通过 token_uri 指向外部 JSON 管理元数据。请将以下 JSON 上传到你的服务器或 IPFS，然后在铸造时使用该 URL 作为 token_uri。</span><br><br>
+    <strong>${t('msg.jsonReady')}</strong><br><br>
+    <span style="font-size:12px;color:var(--text-muted)">${t('msg.jsonDesc')}</span><br><br>
     <pre style="background:var(--bg);padding:12px;border-radius:8px;overflow-x:auto;font-size:12px;white-space:pre-wrap">${escapeHtml(jsonStr)}</pre>
-    <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent).then(()=>showToast('已复制','success'))">📋 复制 JSON</button>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent).then(()=>showToast(t('msg.copied'),'success'))">${t('btn.copyJson')}</button>
   `;
-  showToast('元数据 JSON 已生成', 'success');
+  showToast(t('msg.jsonCopied'), 'success');
 }
 
 function showToast(msg, type = '') {
@@ -810,8 +1076,22 @@ function showToast(msg, type = '') {
   setTimeout(() => toast.remove(), 4000);
 }
 
-// 初始化
-renderDeployedContracts();
+// ========== 初始化 ==========
+(function () {
+  function boot() {
+    try { applyI18n(); } catch (e) { console.warn('[NFT-i18n] failed:', e); }
+    try { renderDeployedContracts(); } catch (e) { console.warn('[NFT-init] render failed:', e); }
+    try {
+      const fCover = document.getElementById('fileCover');
+      if (fCover) fCover.addEventListener('change', handleCoverUpload);
+    } catch (e) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
 </script>
 </body>
 </html>
