@@ -144,7 +144,12 @@ const LANG = {
     common: {
       connectFirst: '请先连接钱包',
       sending: '发送中...',
-      loading: '加载中...'
+      loading: '加载中...',
+      connect: '连接钱包',
+      disconnect: '断开',
+      mainnet: '主网',
+      testnet: '测试网',
+      langSwitch: '中/English',
     }
   },
   en: {
@@ -284,7 +289,12 @@ const LANG = {
     common: {
       connectFirst: 'Please connect wallet first',
       sending: 'Sending...',
-      loading: 'Loading...'
+      loading: 'Loading...',
+      connect: 'Connect Wallet',
+      disconnect: 'Disconnect',
+      mainnet: 'Mainnet',
+      testnet: 'Testnet',
+      langSwitch: 'English/中',
     }
   }
 };
@@ -304,11 +314,22 @@ function t(key) {
 function toggleLanguage() {
   currentLang = currentLang === 'zh' ? 'en' : 'zh';
   localStorage.setItem('paxi_lang', currentLang);
-  const btn = document.getElementById('langBtn');
-  if (btn) btn.textContent = currentLang === 'zh' ? '中/english' : 'english/中';
-  document.getElementById('appTitle').textContent = t('appTitle');
+  updateHeaderUI();
   if (state.currentView === 'home') renderHome();
   else if (state.currentTool) renderTool(state.currentTool);
+}
+
+function updateHeaderUI() {
+  const langBtn = document.getElementById('langBtn');
+  if (langBtn) langBtn.textContent = t('common.langSwitch');
+  const appTitle = document.getElementById('appTitle');
+  if (appTitle) appTitle.textContent = t('appTitle');
+  const btnConnect = document.getElementById('btnConnect');
+  if (btnConnect) btnConnect.textContent = t('common.connect');
+  const btnDisconnect = document.getElementById('btnDisconnect');
+  if (btnDisconnect) btnDisconnect.textContent = t('common.disconnect');
+  // 重新渲染网络选择器
+  if (typeof renderNetworkSelector === 'function') renderNetworkSelector('networkSelector');
 }
 
 // ============================================================
@@ -357,13 +378,17 @@ const state = {
 // ============================================================
 // 初始化
 // ============================================================
-document.addEventListener('DOMContentLoaded', () => {
-  const langBtn = document.getElementById('langBtn');
-  if (langBtn) langBtn.textContent = currentLang === 'zh' ? '中/english' : 'english/中';
-  document.getElementById('appTitle').textContent = t('appTitle');
+function initApp() {
+  updateHeaderUI();
   renderHome();
   checkWalletInjection();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 function checkWalletInjection() {
   let attempts = 0;
@@ -415,10 +440,10 @@ function renderHome() {
 
   main.innerHTML = `
     <div class="home-grid">
-      ${tools.map(t => `
-        <div class="tool-card" data-tool="${t.id}">
-          <div class="icon">${t.icon}</div>
-          <div class="name">${t(t.label)}</div>
+      ${tools.map(item => `
+        <div class="tool-card" data-tool="${item.id}">
+          <div class="icon">${item.icon}</div>
+          <div class="name">${t(item.label)}</div>
         </div>
       `).join('')}
     </div>

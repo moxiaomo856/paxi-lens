@@ -500,14 +500,25 @@ function cleanupLocalStorage() {
 
 // ============================================================
 // 网络选择器 UI（在 header 中注入）
+// 支持多语言显示
 // ============================================================
 function renderNetworkSelector(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
+
+  // 从全局语言设置读取（如果存在）
+  const hasLang = typeof currentLang !== 'undefined';
+  const mainnetLabel = (hasLang && typeof t === 'function') ? t('common.mainnet') : (currentLang === 'zh' ? '主网' : 'Mainnet');
+  const testnetLabel = (hasLang && typeof t === 'function') ? t('common.testnet') : (currentLang === 'zh' ? '测试网' : 'Testnet');
+
+  // fallback：直接读取 NETWORKS 中的 name (兼容旧版本)
+  const finalMain = currentNetwork === 'mainnet' && !hasLang ? NETWORKS.mainnet.name : mainnetLabel;
+  const finalTest = currentNetwork === 'testnet' && !hasLang ? NETWORKS.testnet.name : testnetLabel;
+
   el.innerHTML = `
     <select id="networkSelect" onchange="switchNetwork(this.value)" style="font-size:11px;padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)">
-      <option value="mainnet" ${currentNetwork === 'mainnet' ? 'selected' : ''}>主网</option>
-      <option value="testnet" ${currentNetwork === 'testnet' ? 'selected' : ''}>测试网</option>
+      <option value="mainnet" ${currentNetwork === 'mainnet' ? 'selected' : ''}>${mainnetLabel}</option>
+      <option value="testnet" ${currentNetwork === 'testnet' ? 'selected' : ''}>${testnetLabel}</option>
     </select>
   `;
 }
