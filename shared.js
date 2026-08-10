@@ -330,6 +330,16 @@ async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
     throw new Error('钱包未连接');
   }
 
+  // 检查 SDK 是否就绪
+  if (typeof window.PaxiCosmJS === 'undefined') {
+    throw new Error('SDK 尚未加载，请稍后重试或刷新页面');
+  }
+  // 检查 compat 层是否已应用（关键消息编码类必须已覆盖）
+  if (typeof window.PaxiCosmJS._compatReady === 'undefined') {
+    // 如果 compat 还没准备好，手动触发一次
+    console.warn('[SDK] compat 层可能尚未就绪，消息编码可能使用 SDK 原生版本');
+  }
+
   // 兼容两种 wallet 格式
   const pubKey = wallet.public_key || wallet.publicKey;
   if (!pubKey) throw new Error('钱包公钥缺失');
