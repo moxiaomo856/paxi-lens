@@ -52,7 +52,7 @@
       flex-wrap: wrap;
       gap: 6px;
     }
-    .header-left { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; width: 100%; }
+    .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .logo {
       width: 32px; height: 32px;
       background: var(--primary);
@@ -74,10 +74,9 @@
     .header-right {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 6px;
       flex-wrap: wrap;
-      width: 100%;
+      flex-shrink: 0;
     }
     .header-right .wallet-balance {
       font-size: 11px;
@@ -535,16 +534,26 @@
       font-family: monospace;
     }
 
+    /* ========== Mobile ========== */
+    @media (max-width: 767px) {
+      .header-left { width: 100%; justify-content: center; }
+      .header-right { width: 100%; justify-content: center; }
+    }
     /* ========== Desktop ========== */
     @media (min-width: 768px) {
-      .home-grid { grid-template-columns: repeat(3, 1fr); }
+      .home-grid { grid-template-columns: repeat(4, 1fr); }
       .nft-market-grid { grid-template-columns: repeat(3, 1fr); }
       .main { padding: 20px 16px; }
       .header-title { font-size: 17px; }
+      .tool-card { padding: 18px 10px; min-height: 80px; }
+      .tool-card .icon { font-size: 26px; }
+      .tool-card .name { font-size: 13px; }
     }
     @media (max-width: 360px) {
-      .home-grid { grid-template-columns: 1fr; }
-      .nft-market-grid { grid-template-columns: 1fr; }
+      .home-grid { gap: 8px; }
+      .tool-card { padding: 12px 4px; min-height: 68px; }
+      .tool-card .icon { font-size: 20px; }
+      .tool-card .name { font-size: 10px; }
       .header-right .wallet-address { max-width: 60px; }
     }
   </style>
