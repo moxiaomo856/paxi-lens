@@ -318,26 +318,9 @@ async function simulateGas(txBytesBase64) {
 // 交易构建 & 签名 & 广播（通用函数）
 // wallet: { address, public_key, algo } 或 { address, publicKey, connected }
 // ============================================================
-// 解析 SHARED_CONFIG.gasPrice 数值（例如 "0.05upaxi" -> 0.05）
-function parseGasPriceAmount() {
-  const raw = SHARED_CONFIG.gasPrice || '0.05upaxi';
-  const match = String(raw).match(/^([\d.]+)/);
-  return match ? parseFloat(match[1]) : 0.05;
-}
-
 async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
   if (!wallet || !wallet.address) {
     throw new Error('钱包未连接');
-  }
-
-  // 检查 SDK 是否就绪
-  if (typeof window.PaxiCosmJS === 'undefined') {
-    throw new Error('SDK 尚未加载，请稍后重试或刷新页面');
-  }
-  // 检查 compat 层是否已应用（关键消息编码类必须已覆盖）
-  if (typeof window.PaxiCosmJS._compatReady === 'undefined') {
-    // 如果 compat 还没准备好，手动触发一次
-    console.warn('[SDK] compat 层可能尚未就绪，消息编码可能使用 SDK 原生版本');
   }
 
   // 兼容两种 wallet 格式
@@ -354,81 +337,38 @@ async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
 
   const chainId = getChainId();
   const denom = getDenom();
+
+  // Gas 计算：优先用传入值，否则按消息类型动态估算
+  let totalGas = gasLimit;
+  if (!totalGas) {
+    // 按消息类型分别估算
+    let gasSum = 0;
+    for (const msg of messages) {
+      if (msg.typeUrl?.includes('MsgSend')) gasSum += 90000;
+      else if (msg.typeUrl?.includes('MsgExecuteContract')) gasSum += 250000;
+      else if (msg.typeUrl?.includes('MsgInstantiateContract')) gasSum += 500000;
+      else if (msg.typeUrl?.includes('MsgGrant')) gasSum += 120000;
+      else if (msg.typeUrl?.includes('MsgExec')) gasSum += 300000;
+      else if (msg.typeUrl?.includes('MsgRevoke')) gasSum += 100000;
+      else gasSum += 200000;
+    }
+    totalGas = gasSum + 100000; // 基础开销
+  }
+
+  // TxBody
+  const txBody = PaxiCosmJS.TxBody.fromPartial({ messages, memo });
+
+  // Fee
+  const fee = {
+    amount: [PaxiCosmJS.coins(Math.floor(totalGas * 0.05).toString(), denom)[0]],
+    gasLimit: BigInt(totalGas),
+  };
+
+  // PubKey
   const pubkeyBytes = typeof pubKey === 'string' ? fromBase64(pubKey) : new Uint8Array(pubKey);
   const pubkeyAny = {
     typeUrl: '/cosmos.crypto.secp256k1.PubKey',
     value: PaxiCosmJS.PubKey.encode({ key: pubkeyBytes }).finish(),
-  };
-
-  // TxBody（构建一次，模拟和签名都用）
-  const txBody = PaxiCosmJS.TxBody.fromPartial({ messages, memo });
-  const bodyBytes = PaxiCosmJS.TxBody.encode(txBody).finish();
-
-  // Gas 计算：传入值 -> 模拟值 -> 硬编码估算
-  let totalGas = gasLimit;
-  if (!totalGas) {
-    // 1. 先尝试调用链上 simulate
-    try {
-      // 构造一个临时的 Fee + AuthInfo + TxRaw 用于模拟
-      const tempGas = 2000000;
-      const tempFee = {
-        amount: [PaxiCosmJS.coins('1', denom)[0]],
-        gasLimit: BigInt(tempGas),
-      };
-      const tempAuthInfo = PaxiCosmJS.AuthInfo.fromPartial({
-        signerInfos: [{
-          publicKey: pubkeyAny,
-          modeInfo: { single: { mode: 1 } },
-          sequence: BigInt(sequence),
-        }],
-        fee: tempFee,
-      });
-      const tempSignDoc = PaxiCosmJS.SignDoc.fromPartial({
-        bodyBytes,
-        authInfoBytes: PaxiCosmJS.AuthInfo.encode(tempAuthInfo).finish(),
-        chainId,
-        accountNumber: BigInt(accountNumber),
-      });
-      // 模拟不需要真实签名，用空签名构造 TxRaw
-      const tempTxRaw = PaxiCosmJS.TxRaw.fromPartial({
-        bodyBytes: tempSignDoc.bodyBytes,
-        authInfoBytes: tempSignDoc.authInfoBytes,
-        signatures: [new Uint8Array(64)], // 64 字节占位签名
-      });
-      const tempTxBytes = PaxiCosmJS.TxRaw.encode(tempTxRaw).finish();
-      const simulated = await simulateGas(toBase64(tempTxBytes));
-      if (simulated && simulated > 0) {
-        totalGas = simulated;
-        console.log('[Gas] 模拟成功，使用模拟值:', totalGas);
-      }
-    } catch (e) {
-      console.warn('[Gas] 模拟过程异常，降级为估算:', e.message);
-    }
-
-    // 2. 模拟失败，按消息类型估算
-    if (!totalGas) {
-      let gasSum = 0;
-      for (const msg of messages) {
-        if (msg.typeUrl?.includes('MsgSend')) gasSum += 90000;
-        else if (msg.typeUrl?.includes('MsgExecuteContract')) gasSum += 250000;
-        else if (msg.typeUrl?.includes('MsgInstantiateContract')) gasSum += 500000;
-        else if (msg.typeUrl?.includes('MsgGrant')) gasSum += 120000;
-        else if (msg.typeUrl?.includes('MsgExec')) gasSum += 300000;
-        else if (msg.typeUrl?.includes('MsgRevoke')) gasSum += 100000;
-        else gasSum += 200000;
-      }
-      totalGas = gasSum + 100000; // 基础开销
-      console.log('[Gas] 使用估算值:', totalGas);
-    }
-  }
-
-  // 从 SHARED_CONFIG.gasPrice 读取（问题6修复）
-  const gasPriceAmount = parseGasPriceAmount();
-
-  // Fee
-  const fee = {
-    amount: [PaxiCosmJS.coins(Math.floor(totalGas * gasPriceAmount).toString(), denom)[0]],
-    gasLimit: BigInt(totalGas),
   };
 
   // AuthInfo
@@ -440,12 +380,11 @@ async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
     }],
     fee,
   });
-  const authInfoBytes = PaxiCosmJS.AuthInfo.encode(authInfo).finish();
 
-  // SignDoc — 复用 bodyBytes 避免重复编码
+  // SignDoc
   const signDoc = PaxiCosmJS.SignDoc.fromPartial({
-    bodyBytes,
-    authInfoBytes,
+    bodyBytes: PaxiCosmJS.TxBody.encode(txBody).finish(),
+    authInfoBytes: PaxiCosmJS.AuthInfo.encode(authInfo).finish(),
     chainId,
     accountNumber: BigInt(accountNumber),
   });
@@ -567,10 +506,14 @@ function renderNetworkSelector(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
-  // 检查 t 函数是否可用（如果 app.js 还没加载，用默认值）
-  const hasT = typeof t === 'function';
-  const mainnetLabel = hasT ? t('common.mainnet') : '主网';
-  const testnetLabel = hasT ? t('common.testnet') : '测试网';
+  // 从全局语言设置读取（如果存在）
+  const hasLang = typeof currentLang !== 'undefined';
+  const mainnetLabel = (hasLang && typeof t === 'function') ? t('common.mainnet') : (currentLang === 'zh' ? '主网' : 'Mainnet');
+  const testnetLabel = (hasLang && typeof t === 'function') ? t('common.testnet') : (currentLang === 'zh' ? '测试网' : 'Testnet');
+
+  // fallback：直接读取 NETWORKS 中的 name (兼容旧版本)
+  const finalMain = currentNetwork === 'mainnet' && !hasLang ? NETWORKS.mainnet.name : mainnetLabel;
+  const finalTest = currentNetwork === 'testnet' && !hasLang ? NETWORKS.testnet.name : testnetLabel;
 
   el.innerHTML = `
     <select id="networkSelect" onchange="switchNetwork(this.value)" style="font-size:11px;padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text)">

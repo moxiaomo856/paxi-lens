@@ -145,18 +145,17 @@
       padding-bottom: calc(16px + var(--safe-bottom));
     }
 
-    /* ========== 首页网格（移动端优先：手机=3列，固定不缩） ========== */
+    /* ========== 首页网格 ========== */
     .home-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 10px;
-      width: 100%;
     }
     .tool-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 14px 4px;
+      padding: 14px 6px;
       text-align: center;
       cursor: pointer;
       transition: all 0.15s;
@@ -166,14 +165,10 @@
       gap: 4px;
       min-height: 72px;
       justify-content: center;
-      width: 100%;
-      -webkit-user-select: none;
-      user-select: none;
-      touch-action: manipulation;
     }
     .tool-card:active { background: var(--bg-hover); transform: scale(0.97); }
-    .tool-card .icon { font-size: 24px; line-height: 1.2; margin-bottom: 2px; }
-    .tool-card .name { font-size: 11px; font-weight: 600; line-height: 1.3; color: var(--text); word-break: break-word; -webkit-font-smoothing: antialiased; }
+    .tool-card .icon { font-size: 22px; line-height: 1.2; }
+    .tool-card .name { font-size: 11px; font-weight: 600; line-height: 1.3; }
 
     /* ========== 二级页面返回栏 ========== */
     .back-bar {
@@ -539,116 +534,24 @@
       font-family: monospace;
     }
 
-    /* ========== Governance 样式 ========== */
-    .proposal-item {
-      background: var(--bg);
-      border-radius: 8px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      border-left: 4px solid var(--border);
-      transition: all 0.15s;
-    }
-    .proposal-item.deposit { border-left-color: var(--warning); }
-    .proposal-item.voting { border-left-color: var(--primary); }
-    .proposal-item.passed { border-left-color: var(--success); }
-    .proposal-item.rejected { border-left-color: var(--danger); }
-    .proposal-item .proposal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-    .proposal-item .proposal-status {
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 100px;
-      font-weight: 600;
-    }
-    .proposal-item .proposal-status.deposit { background: rgba(245,158,11,0.15); color: var(--warning); }
-    .proposal-item .proposal-status.voting { background: rgba(99,102,241,0.15); color: var(--primary); }
-    .proposal-item .proposal-status.passed { background: rgba(34,197,94,0.15); color: var(--success); }
-    .proposal-item .proposal-status.rejected { background: rgba(239,68,68,0.15); color: var(--danger); }
-    .proposal-item .proposal-body {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin: 4px 0;
-    }
-    .proposal-item .proposal-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 4px;
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 6px;
-    }
-    .proposal-item .proposal-actions {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .proposal-item .proposal-deposit {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
-
-    /* ========== Modal ========== */
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.7);
-      z-index: 999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .modal-box {
-      background: var(--bg-card);
-      border-radius: 12px;
-      padding: 24px;
-      max-width: 400px;
-      width: 100%;
-      border: 1px solid var(--border);
-    }
-    .modal-box .modal-title {
-      font-weight: 600;
-      font-size: 16px;
-      margin-bottom: 12px;
-    }
-    .modal-box .modal-options {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
-    .modal-box .modal-options .btn { justify-content: center; }
-
     /* ========== Mobile ========== */
     @media (max-width: 767px) {
       .header-left { width: 100%; justify-content: center; }
       .header-right { width: 100%; justify-content: center; }
-      /* 手机端：home-grid 始终保持 3 列，不缩列数 */
-      .home-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 8px; }
     }
     /* ========== Desktop ========== */
     @media (min-width: 768px) {
       .home-grid { grid-template-columns: repeat(4, 1fr); }
       .nft-market-grid { grid-template-columns: repeat(3, 1fr); }
-      .main { padding: 20px 16px; max-width: 720px; }
+      .main { padding: 20px 16px; }
       .header-title { font-size: 17px; }
-      .tool-card { padding: 18px 10px; min-height: 84px; }
-      .tool-card .icon { font-size: 28px; }
+      .tool-card { padding: 18px 10px; min-height: 80px; }
+      .tool-card .icon { font-size: 26px; }
       .tool-card .name { font-size: 13px; }
     }
-    /* ========== 小屏手机（如 iPhone SE 320px 宽度）========== */
-    @media (max-width: 380px) {
-      .main { padding: 10px 10px; }
-      .home-grid { gap: 6px; grid-template-columns: repeat(3, 1fr) !important; }
-      .tool-card { padding: 12px 3px; min-height: 68px; }
+    @media (max-width: 360px) {
+      .home-grid { gap: 8px; }
+      .tool-card { padding: 12px 4px; min-height: 68px; }
       .tool-card .icon { font-size: 20px; }
       .tool-card .name { font-size: 10px; }
       .header-right .wallet-address { max-width: 60px; }
@@ -678,55 +581,29 @@
 
 <!-- ===== MAIN ===== -->
 <main class="main" id="mainContent">
-  <!-- 加载占位（避免 SDK 加载慢导致白屏） -->
-  <div id="homeFallback" style="opacity:0.9">
-    <div class="home-grid">
-      <div class="tool-card"><div class="icon">📤</div><div class="name">批量转账</div></div>
-      <div class="tool-card"><div class="icon">💰</div><div class="name">余额查询</div></div>
-      <div class="tool-card"><div class="icon">🏪</div><div class="name">NFT市场</div></div>
-      <div class="tool-card"><div class="icon">🔍</div><div class="name">交易追踪</div></div>
-      <div class="tool-card"><div class="icon">🎨</div><div class="name">NFT发射</div></div>
-      <div class="tool-card"><div class="icon">🔄</div><div class="name">地址转换</div></div>
-      <div class="tool-card"><div class="icon">🔄</div><div class="name">质押迁移</div></div>
-      <div class="tool-card"><div class="icon">⛽</div><div class="name">Gas计算</div></div>
-      <div class="tool-card"><div class="icon">🏦</div><div class="name">验证节点</div></div>
-      <div class="tool-card"><div class="icon">📊</div><div class="name">买卖发布</div></div>
-      <div class="tool-card"><div class="icon">🗳️</div><div class="name">治理提案</div></div>
-      <div class="tool-card"><div class="icon">📌</div><div class="name">后期开发</div></div>
-    </div>
-  </div>
+  <!-- 动态渲染 -->
 </main>
 
-<!-- ===== SCRIPTS =====
-     关键修复：SDK 改成 async 加载，不阻塞后续脚本执行。
-     SDK 未加载时仍能查看 UI，点击工具时才提示安装钱包/加载 SDK。 -->
-<script>
-  // 检测 SDK 加载状态并输出提示
-  window.__sdkLoadStart = Date.now();
-  window.__sdkLoaded = false;
-  window.addEventListener('error', function(e) {
-    console.error('[Global Error]', e.message || e.error || e);
-  });
-</script>
-<script src="https://mainnet-api.paxinet.io/resources/js/paxi-cosmjs.umd.js"
-  async
-  onerror="console.warn('[SDK] paxi-cosmjs CDN failed, UI still available for browsing');">
-</script>
-<script src="compat.js"></script>
+<!-- ===== SCRIPTS ===== -->
+<script src="https://mainnet-api.paxinet.io/resources/js/paxi-cosmjs.umd.js"></script>
 <script src="shared.js"></script>
+<script src="compat.js"></script>
+<!-- 核心模块（语言/状态/钱包/首页） -->
+<script src="appjs/core.js"></script>
+<!-- 工具模块（按顺序加载，互不依赖） -->
+<script src="appjs/tools/batch-transfer.js"></script>
+<script src="appjs/tools/balance-check.js"></script>
+<script src="appjs/tools/tx-gas.js"></script>
+<script src="appjs/tools/address-convert.js"></script>
+<script src="appjs/tools/validator-compare.js"></script>
+<script src="appjs/tools/redelegate.js"></script>
+<script src="appjs/tools/nft-market.js"></script>
+<script src="appjs/tools/p2p-market.js"></script>
+<!-- 主入口（路由 + 初始化） -->
 <script src="app.js"></script>
 <script>
-  // 兜底：5 秒后如果仍是 fallback，说明 JS 崩溃了，至少让用户看到按钮有响应
-  (function () {
-    function tryInit() {
-      try {
-        if (typeof renderNetworkSelector === 'function') renderNetworkSelector('networkSelector');
-      } catch (e) { console.warn('[Fallback] network selector error:', e.message); }
-    }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', tryInit);
-    } else { tryInit(); }
-  })();
+  // 初始化网络选择器（主网/测试网）
+  renderNetworkSelector('networkSelector');
 </script>
 </body>
 </html>

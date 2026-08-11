@@ -77,15 +77,16 @@
   const MsgSend = {
     fromPartial(data) { return data; },
     encode(data) {
-      const fromAddress = data.fromAddress || data.from_address || '';
-      const toAddress = data.toAddress || data.to_address || '';
+      const fromAddress = data.fromAddress || data.from_address;
+      const toAddress = data.toAddress || data.to_address;
       const parts = [
         encodeLenDelim(1, fromAddress),
         encodeLenDelim(2, toAddress),
       ];
+      // amount 是 repeated Coin
       if (data.amount && data.amount.length > 0) {
         for (const coin of data.amount) {
-          const coinBytes = encodeCoin(coin.denom || coin.denom_, coin.amount || coin.amount_ || '0');
+          const coinBytes = encodeCoin(coin.denom, coin.amount);
           parts.push(encodeLenDelim(3, coinBytes));
         }
       }
@@ -102,17 +103,17 @@
   const MsgExecuteContract = {
     fromPartial(data) { return data; },
     encode(data) {
-      const sender = data.sender || data.sender_address || '';
-      const contract = data.contract || data.contract_addr || '';
-      const msgBytes = data.msg || new Uint8Array();
+      const sender = data.sender || data.sender_address;
+      const contract = data.contract || data.contract_addr;
+      const msg = data.msg || new Uint8Array();
       const parts = [
         encodeLenDelim(1, sender),
         encodeLenDelim(2, contract),
-        encodeLenDelim(3, msgBytes),
+        encodeLenDelim(3, msg),
       ];
       if (data.funds && data.funds.length > 0) {
         for (const coin of data.funds) {
-          const coinBytes = encodeCoin(coin.denom || coin.denom_, coin.amount || coin.amount_ || '0');
+          const coinBytes = encodeCoin(coin.denom, coin.amount);
           parts.push(encodeLenDelim(5, coinBytes));
         }
       }
@@ -128,21 +129,16 @@
   const MsgInstantiateContract = {
     fromPartial(data) { return data; },
     encode(data) {
-      const sender = data.sender || data.sender_address || '';
-      const admin = data.admin || data.admin_address || '';
-      const codeId = data.codeId ?? data.code_id ?? 0;
-      const label = data.label || '';
-      const msgBytes = data.msg || new Uint8Array();
       const parts = [
-        encodeLenDelim(1, sender),
-        encodeLenDelim(2, admin),
-        encodeVarintField(3, codeId),
-        encodeLenDelim(4, label),
-        encodeLenDelim(5, msgBytes),
+        encodeLenDelim(1, data.sender),
+        encodeLenDelim(2, data.admin || ''),
+        encodeVarintField(3, data.codeId || data.code_id || 0),
+        encodeLenDelim(4, data.label || ''),
+        encodeLenDelim(5, data.msg || new Uint8Array()),
       ];
       if (data.funds && data.funds.length > 0) {
         for (const coin of data.funds) {
-          const coinBytes = encodeCoin(coin.denom || coin.denom_, coin.amount || coin.amount_ || '0');
+          const coinBytes = encodeCoin(coin.denom, coin.amount);
           parts.push(encodeLenDelim(6, coinBytes));
         }
       }
@@ -168,12 +164,10 @@
   // ============================================================
   const AnyEncode = {
     encode(data) {
-      const typeUrl = data.typeUrl || data.type_url || '';
-      const value = data.value || new Uint8Array();
       return {
         finish: () => concatBytes(
-          encodeLenDelim(1, typeUrl),
-          encodeLenDelim(2, value),
+          encodeLenDelim(1, data.typeUrl),
+          encodeLenDelim(2, data.value),
         ),
       };
     },
@@ -187,8 +181,7 @@
   const GenericAuthorization = {
     fromPartial(data) { return data; },
     encode(data) {
-      const msg = data.msg || data.msg_type_url || '';
-      return { finish: () => encodeLenDelim(1, msg) };
+      return { finish: () => encodeLenDelim(1, data.msg) };
     },
   };
 
@@ -200,12 +193,10 @@
   const Timestamp = {
     fromPartial(data) { return data; },
     encode(data) {
-      const seconds = data.seconds ?? 0;
-      const nanos = data.nanos ?? 0;
       return {
         finish: () => concatBytes(
-          encodeVarintField(1, seconds),
-          encodeVarintField(2, nanos),
+          encodeVarintField(1, data.seconds),
+          encodeVarintField(2, data.nanos || 0),
         ),
       };
     },
@@ -238,13 +229,11 @@
   const MsgGrant = {
     fromPartial(data) { return data; },
     encode(data) {
-      const granter = data.granter || data.granter_address || '';
-      const grantee = data.grantee || data.grantee_address || '';
       const grantBytes = Grant.encode(data.grant).finish();
       return {
         finish: () => concatBytes(
-          encodeLenDelim(1, granter),
-          encodeLenDelim(2, grantee),
+          encodeLenDelim(1, data.granter),
+          encodeLenDelim(2, data.grantee),
           encodeLenDelim(3, grantBytes),
         ),
       };
@@ -259,9 +248,8 @@
   const MsgExec = {
     fromPartial(data) { return data; },
     encode(data) {
-      const grantee = data.grantee || data.grantee_address || '';
-      const parts = [encodeLenDelim(1, grantee)];
-      if (data.msgs && data.msgs.length > 0) {
+      const parts = [encodeLenDelim(1, data.grantee)];
+      if (data.msgs) {
         for (const msg of data.msgs) {
           const anyBytes = AnyEncode.encode(msg).finish();
           parts.push(encodeLenDelim(2, anyBytes));
@@ -279,14 +267,11 @@
   const MsgUpdateAdmin = {
     fromPartial(data) { return data; },
     encode(data) {
-      const sender = data.sender || data.sender_address || '';
-      const newAdmin = data.newAdmin || data.new_admin || '';
-      const contract = data.contract || data.contract_addr || '';
       return {
         finish: () => concatBytes(
-          encodeLenDelim(1, sender),
-          encodeLenDelim(2, newAdmin),
-          encodeLenDelim(3, contract),
+          encodeLenDelim(1, data.sender),
+          encodeLenDelim(2, data.newAdmin),
+          encodeLenDelim(3, data.contract),
         ),
       };
     },
@@ -300,16 +285,12 @@
   const MsgMigrateContract = {
     fromPartial(data) { return data; },
     encode(data) {
-      const sender = data.sender || data.sender_address || '';
-      const contract = data.contract || data.contract_addr || '';
-      const codeId = data.codeId ?? data.code_id ?? 0;
-      const msgBytes = data.msg || new Uint8Array();
       return {
         finish: () => concatBytes(
-          encodeLenDelim(1, sender),
-          encodeLenDelim(2, contract),
-          encodeVarintField(3, codeId),
-          encodeLenDelim(4, msgBytes),
+          encodeLenDelim(1, data.sender),
+          encodeLenDelim(2, data.contract),
+          encodeVarintField(3, data.codeId || 0),
+          encodeLenDelim(4, data.msg || new Uint8Array()),
         ),
       };
     },
@@ -323,41 +304,13 @@
   const MsgRevoke = {
     fromPartial(data) { return data; },
     encode(data) {
-      const granter = data.granter || data.granter_address || '';
-      const grantee = data.grantee || data.grantee_address || '';
-      const msgTypeUrl = data.msgTypeUrl || data.msg_type_url || '';
       return {
         finish: () => concatBytes(
-          encodeLenDelim(1, granter),
-          encodeLenDelim(2, grantee),
-          encodeLenDelim(3, msgTypeUrl),
+          encodeLenDelim(1, data.granter),
+          encodeLenDelim(2, data.grantee),
+          encodeLenDelim(3, data.msgTypeUrl),
         ),
       };
-    },
-  };
-
-  // ============================================================
-  // MsgDelegate 编码 — 质押委托
-  // protobuf: cosmos.staking.v1beta1.MsgDelegate
-  // { string delegator_address = 1; string validator_address = 2; Coin amount = 3; }
-  // ============================================================
-  const MsgDelegate = {
-    fromPartial(data) { return data; },
-    encode(data) {
-      const delegatorAddress = data.delegator_address || data.delegatorAddress || '';
-      const validatorAddress = data.validator_address || data.validatorAddress || '';
-      const parts = [
-        encodeLenDelim(1, delegatorAddress),
-        encodeLenDelim(2, validatorAddress),
-      ];
-      if (data.amount) {
-        const coinBytes = encodeCoin(
-          data.amount.denom || data.amount.denom_,
-          data.amount.amount || data.amount.amount_ || '0'
-        );
-        parts.push(encodeLenDelim(3, coinBytes));
-      }
-      return { finish: () => concatBytes(...parts) };
     },
   };
 
@@ -370,19 +323,16 @@
   const MsgBeginRedelegate = {
     fromPartial(data) { return data; },
     encode(data) {
-      const delegatorAddress = data.delegator_address || data.delegatorAddress || '';
-      const validatorSrcAddress = data.validator_src_address || data.validatorSrcAddress || '';
-      const validatorDstAddress = data.validator_dst_address || data.validatorDstAddress || '';
+      const delegatorAddress = data.delegator_address || data.delegatorAddress;
+      const validatorSrcAddress = data.validator_src_address || data.validatorSrcAddress;
+      const validatorDstAddress = data.validator_dst_address || data.validatorDstAddress;
       const parts = [
         encodeLenDelim(1, delegatorAddress),
         encodeLenDelim(2, validatorSrcAddress),
         encodeLenDelim(3, validatorDstAddress),
       ];
       if (data.amount) {
-        const coinBytes = encodeCoin(
-          data.amount.denom || data.amount.denom_,
-          data.amount.amount || data.amount.amount_ || '0'
-        );
+        const coinBytes = encodeCoin(data.amount.denom, data.amount.amount);
         parts.push(encodeLenDelim(4, coinBytes));
       }
       return { finish: () => concatBytes(...parts) };
@@ -390,113 +340,7 @@
   };
 
   // ============================================================
-  // 🔥 新增：MsgSubmitProposal 编码 — 提交治理提案
-  // protobuf: cosmos.gov.v1beta1.MsgSubmitProposal
-  // { google.protobuf.Any content = 1; repeated Coin initial_deposit = 2; string proposer = 3; }
-  // ============================================================
-  const MsgSubmitProposal = {
-    fromPartial(data) { return data; },
-    encode(data) {
-      const parts = [];
-      // 1. content (Any) - field 1
-      if (data.content) {
-        const contentBytes = AnyEncode.encode(data.content).finish();
-        parts.push(encodeLenDelim(1, contentBytes));
-      }
-      // 2. initial_deposit (repeated Coin) - field 2
-      const deposits = data.initial_deposit || data.initialDeposit || [];
-      for (const coin of deposits) {
-        const coinBytes = encodeCoin(coin.denom || coin.denom_, coin.amount || coin.amount_ || '0');
-        parts.push(encodeLenDelim(2, coinBytes));
-      }
-      // 3. proposer (string) - field 3
-      const proposer = data.proposer || data.proposer_address || '';
-      if (proposer) {
-        parts.push(encodeLenDelim(3, proposer));
-      }
-      return { finish: () => concatBytes(...parts) };
-    },
-  };
-
-  // ============================================================
-  // 🔥 新增：MsgVote 编码 — 投票
-  // protobuf: cosmos.gov.v1beta1.MsgVote
-  // { uint64 proposal_id = 1; string voter = 2; VoteOption option = 3; }
-  // VoteOption: 0=空, 1=Yes, 2=Abstain, 3=No, 4=NoWithVeto
-  // ============================================================
-  const MsgVote = {
-    fromPartial(data) { return data; },
-    encode(data) {
-      const proposalId = data.proposal_id ?? data.proposalId ?? 0;
-      const voter = data.voter || data.voter_address || '';
-      const option = data.option ?? data.vote_option ?? 1;
-      return {
-        finish: () => concatBytes(
-          encodeVarintField(1, proposalId),
-          encodeLenDelim(2, voter),
-          encodeVarintField(3, option),
-        ),
-      };
-    },
-  };
-
-  // ============================================================
-  // 🔥 新增：TextProposal 编码（提案内容）
-  // protobuf: cosmos.gov.v1beta1.TextProposal
-  // { string title = 1; string description = 2; }
-  // ============================================================
-  const TextProposal = {
-    fromPartial(data) { return data; },
-    encode(data) {
-      return {
-        finish: () => concatBytes(
-          encodeLenDelim(1, data.title || ''),
-          encodeLenDelim(2, data.description || ''),
-        ),
-      };
-    },
-  };
-
-  // ============================================================
-  // 🔥 新增：ParameterChangeProposal 编码（参数修改提案）
-  // protobuf: cosmos.gov.v1beta1.ParameterChangeProposal
-  // { string title = 1; string description = 2; repeated ParamChange changes = 3; }
-  // ParamChange: { string subspace = 1; string key = 2; string value = 3; }
-  // ============================================================
-  const ParamChange = {
-    encode(data) {
-      return {
-        finish: () => concatBytes(
-          encodeLenDelim(1, data.subspace || ''),
-          encodeLenDelim(2, data.key || ''),
-          encodeLenDelim(3, data.value || ''),
-        ),
-      };
-    },
-  };
-
-  const ParameterChangeProposal = {
-    fromPartial(data) { return data; },
-    encode(data) {
-      const parts = [
-        encodeLenDelim(1, data.title || ''),
-        encodeLenDelim(2, data.description || ''),
-      ];
-      if (data.changes && data.changes.length > 0) {
-        for (const change of data.changes) {
-          const changeBytes = ParamChange.encode(change).finish();
-          parts.push(encodeLenDelim(3, changeBytes));
-        }
-      }
-      return { finish: () => concatBytes(...parts) };
-    },
-  };
-
-  // ============================================================
-  // 兼容层入口：强制覆盖所有消息编码类
-  // 原因：SDK 内置的 MsgSend/MsgExecuteContract 等消息类编码可能存在错误，
-  //       必须用我们手写的、经过 protobufjs 验证的正确实现替换。
-  //       但保留 SDK 的 coins/PubKey 等工具类，因为 Fee/AuthInfo 编码依赖它们。
+  // 兼容层入口：检测并补充缺失的类
   // ============================================================
   function applyCompat() {
     if (typeof window.PaxiCosmJS === 'undefined') {
@@ -504,64 +348,42 @@
       return;
     }
 
-    const overrides = {
-      // === 核心消息编码（强制覆盖）===
+    const supplement = {
       MsgSend,
       MsgExecuteContract,
       MsgInstantiateContract,
-      MsgDelegate,
-      MsgBeginRedelegate,
-      // === Authz 相关 ===
+      PubKey,
+      coins,
       GenericAuthorization,
       Timestamp,
       Grant,
       MsgGrant,
       MsgExec,
       MsgRevoke,
-      // === Wasm 相关 ===
       MsgUpdateAdmin,
       MsgMigrateContract,
-      // === 治理相关 ===
-      MsgSubmitProposal,
-      MsgVote,
-      TextProposal,
-      ParameterChangeProposal,
+      MsgBeginRedelegate,
     };
 
-    let replaced = [];
-    for (const [name, impl] of Object.entries(overrides)) {
-      window.PaxiCosmJS[name] = impl;
-      replaced.push(name);
-    }
-
-    window.PaxiCosmJS._compatReady = true;
-    console.log('[Compat] 已强制覆盖消息编码类:', replaced.join(', '));
-    console.log('[Compat] 保留 SDK 原生类: coins, PubKey, Any, TxBody, AuthInfo, SignDoc, TxRaw');
-  }
-
-  // 等待 SDK 加载完成后再应用兼容层
-  // 因为 SDK 使用 async 加载，可能比 compat.js 晚执行
-  function waitForSDK(maxRetries = 50, interval = 100) {
-    if (typeof window.PaxiCosmJS !== 'undefined') {
-      applyCompat();
-      return;
-    }
-    let retries = 0;
-    const timer = setInterval(() => {
-      retries++;
-      if (typeof window.PaxiCosmJS !== 'undefined') {
-        clearInterval(timer);
-        applyCompat();
-      } else if (retries >= maxRetries) {
-        clearInterval(timer);
-        console.error('[Compat] SDK 加载超时，兼容层未能应用');
+    let added = [];
+    for (const [name, impl] of Object.entries(supplement)) {
+      if (typeof window.PaxiCosmJS[name] === 'undefined') {
+        window.PaxiCosmJS[name] = impl;
+        added.push(name);
       }
-    }, interval);
+    }
+
+    if (added.length > 0) {
+      console.log('[Compat] 已补充缺失的类:', added.join(', '));
+    } else {
+      console.log('[Compat] PaxiCosmJS SDK 完整，无需补充');
+    }
   }
 
+  // 在 DOM 加载后执行（确保 SDK 已加载）
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => waitForSDK());
+    document.addEventListener('DOMContentLoaded', applyCompat);
   } else {
-    waitForSDK();
+    applyCompat();
   }
 })();
