@@ -25,38 +25,11 @@ function _pwSetRounds(n) {
 }
 
 function renderPlaneWar() {
-  const rounds = _pwGetRounds();
-  const connected = (typeof state !== 'undefined' && state.connected);
-  const hasRounds = rounds > 0;
-
-  let overlayHTML = '';
-  if (!connected) {
-    overlayHTML = `
-      <div id="pwOverlayTitle" style="font-size:22px;font-weight:800;color:#fff;margin-bottom:12px;">${t('planeWar.title')}</div>
-      <div id="pwOverlaySub" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;text-align:center;line-height:1.8;">
-        ${t('planeWar.needWallet')}<br>
-        ${t('planeWar.payDesc')}
-      </div>
-      <button id="pwStartBtn" class="btn btn-primary" style="min-width:160px;">${t('planeWar.connectFirst')}</button>
-    `;
-  } else if (!hasRounds) {
-    overlayHTML = `
-      <div id="pwOverlayTitle" style="font-size:20px;font-weight:800;color:#fff;margin-bottom:12px;">${t('planeWar.payTitle')}</div>
-      <div id="pwOverlaySub" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;text-align:center;line-height:1.8;">
-        ${t('planeWar.payDesc')}
-      </div>
-      <button id="pwStartBtn" class="btn btn-primary" style="min-width:180px;">${t('planeWar.payBtn')}</button>
-    `;
-  } else {
-    overlayHTML = `
-      <div id="pwOverlayTitle" style="font-size:24px;font-weight:800;color:#fff;margin-bottom:12px;">${t('planeWar.start')}</div>
-      <div id="pwOverlaySub" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;text-align:center;">
-        ${t('planeWar.touchToStart')}<br>
-        <span style="color:var(--primary);font-weight:600;">${t('planeWar.roundsLeft')}: ${rounds}</span>
-      </div>
-      <button id="pwStartBtn" class="btn btn-primary" style="min-width:120px;">${t('planeWar.startBtn')}</button>
-    `;
-  }
+  const overlayHTML = `
+    <div id="pwOverlayTitle" style="font-size:24px;font-weight:800;color:#fff;margin-bottom:12px;">${t('planeWar.start')}</div>
+    <div id="pwOverlaySub" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;text-align:center;">${t('planeWar.touchToStart')}</div>
+    <button id="pwStartBtn" class="btn btn-primary" style="min-width:120px;">${t('planeWar.startBtn')}</button>
+  `;
 
   return `
     <div class="card">
@@ -66,7 +39,6 @@ function renderPlaneWar() {
         <div style="display:flex;gap:8px;justify-content:center;margin-bottom:8px;">
           <span style="background:var(--bg);padding:4px 10px;border-radius:6px;font-size:12px;">${t('planeWar.score')}: <b id="pwScore" style="color:var(--primary)">0</b></span>
           <span style="background:var(--bg);padding:4px 10px;border-radius:6px;font-size:12px;">${t('planeWar.hp')}: <b id="pwHp" style="color:var(--success)">❤❤❤</b></span>
-          <span style="background:var(--bg);padding:4px 10px;border-radius:6px;font-size:12px;">${t('planeWar.roundsLeft')}: <b id="pwRounds" style="color:var(--warning)">${rounds}</b></span>
         </div>
       </div>
       <div style="position:relative;display:flex;justify-content:center;">
@@ -108,25 +80,6 @@ function bindPlaneWarEvents() {
 
 // 点击开始按钮的逻辑分发
 async function onPwStartClick() {
-  const connected = (typeof state !== 'undefined' && state.connected);
-  if (!connected) {
-    if (typeof connectWallet === 'function') {
-      await connectWallet();
-      if (state.connected) {
-        renderTool('plane-war', 'plane-war');
-      }
-    } else {
-      showToast(t('planeWar.needWallet'), 'warning');
-    }
-    return;
-  }
-
-  const rounds = _pwGetRounds();
-  if (rounds <= 0) {
-    await _pwPayAndStart();
-    return;
-  }
-
   startPlaneWarGame();
 }
 
@@ -205,16 +158,6 @@ async function _pwPayAndStart() {
 
 function startPlaneWarGame() {
   if (!_planeWarCanvas || !_planeWarCtx) return;
-
-  const rounds = _pwGetRounds();
-  if (rounds <= 0) {
-    showToast(t('planeWar.noRounds'), 'warning');
-    _pwShowPayOverlay();
-    return;
-  }
-  _pwSetRounds(rounds - 1);
-  const roundsEl = document.getElementById('pwRounds');
-  if (roundsEl) roundsEl.textContent = rounds - 1;
 
   const overlay = document.getElementById('pwOverlay');
   if (overlay) overlay.style.display = 'none';
@@ -630,11 +573,8 @@ function gameOver() {
     const sub = document.getElementById('pwOverlaySub');
     const btn = document.getElementById('pwStartBtn');
     if (title) title.textContent = t('planeWar.gameOver');
-    const remainingRounds = _pwGetRounds();
-    if (sub) sub.innerHTML = `${t('planeWar.finalScore')}: <b style="color:var(--primary);font-size:20px;">${s.score}</b><br><span style="font-size:12px;color:var(--text-muted)">${t('planeWar.roundsLeft')}: ${remainingRounds}</span>`;
-    if (btn) {
-      btn.textContent = remainingRounds > 0 ? t('planeWar.playAgain') : t('planeWar.buyRounds');
-    }
+    if (sub) sub.innerHTML = `${t('planeWar.finalScore')}: <b style="color:var(--primary);font-size:20px;">${s.score}</b>`;
+    if (btn) btn.textContent = t('planeWar.playAgain');
   }
 }
 

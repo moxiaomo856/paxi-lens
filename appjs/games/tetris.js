@@ -229,7 +229,7 @@ function _lockTetris() {
     }
   }
   _clearLines();
-  _spawnTetris();
+  _spawnTetrisPiece();
 }
 
 function _clearLines() {

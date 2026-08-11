@@ -43,6 +43,94 @@ function bindBubbleEvents() {
   GamePay.bindStart('bubble-shooter', startBubbleGame);
 }
 
+// 开局网格清理：循环清除已存在的三消组和悬空泡泡
+// 防止开局随机生成就自带"免费消除"或出现孤立泡泡
+function _cleanupInitialGrid() {
+  const g = _bubbleState.grid;
+  const colsAtRow = (r) => r % 2 === 0 ? BUBBLE_COLS : BUBBLE_COLS - 1;
+  const getNeighbors = (r, c) => {
+    // 六边形邻居偏移（关键：偶数行 offset=-1，奇数行 offset=0）
+    // 偶数行(10列): 上/下邻居 = [c-1, c]  offset=-1
+    // 奇数行(9列):  上/下邻居 = [c, c+1]  offset=0
+    const offset = r % 2 === 0 ? -1 : 0;
+    return [
+      [r, c - 1], [r, c + 1],
+      [r - 1, c + offset], [r - 1, c + offset + 1],
+      [r + 1, c + offset], [r + 1, c + offset + 1],
+    ].filter(([nr, nc]) => nr >= 0 && nr < g.length && nc >= 0 && nc < colsAtRow(nr));
+  };
+
+  // 循环，直到一次清理后没有任何变化
+  let changed = true;
+  while (changed) {
+    changed = false;
+
+    // 1. 扫描所有已存在的同色组，清除 >=3 的
+    const visited = new Set();
+    for (let r = 0; r < g.length; r++) {
+      for (let c = 0; c < colsAtRow(r); c++) {
+        if (!g[r][c]) continue;
+        const key = r + ',' + c;
+        if (visited.has(key)) continue;
+
+        // BFS 找同色连通组
+        const color = g[r][c].color;
+        const group = [];
+        const q = [[r, c]];
+        visited.add(key);
+        while (q.length > 0) {
+          const [cr, cc] = q.shift();
+          if (!g[cr][cc] || g[cr][cc].color !== color) continue;
+          group.push([cr, cc]);
+          for (const [nr, nc] of getNeighbors(cr, cc)) {
+            const nk = nr + ',' + nc;
+            if (!visited.has(nk) && g[nr] && g[nr][nc] && g[nr][nc].color === color) {
+              visited.add(nk);
+              q.push([nr, nc]);
+            }
+          }
+        }
+
+        if (group.length >= 3) {
+          for (const [gr, gc] of group) {
+            g[gr][gc] = null;
+          }
+          changed = true;
+        }
+      }
+    }
+
+    if (!changed) break;
+
+    // 2. 清除悬空泡泡（从顶部 BFS 标记连通的）
+    const connected = new Set();
+    const topQ = [];
+    if (g[0]) {
+      for (let cc = 0; cc < g[0].length; cc++) {
+        if (g[0][cc]) { topQ.push([0, cc]); connected.add('0,' + cc); }
+      }
+    }
+    while (topQ.length > 0) {
+      const [cr, cc] = topQ.shift();
+      for (const [nr, nc] of getNeighbors(cr, cc)) {
+        const nk = nr + ',' + nc;
+        if (!connected.has(nk) && g[nr] && g[nr][nc]) {
+          connected.add(nk);
+          topQ.push([nr, nc]);
+        }
+      }
+    }
+    for (let r = 1; r < g.length; r++) {
+      for (let c = 0; c < colsAtRow(r); c++) {
+        if (g[r][c] && !connected.has(r + ',' + c)) {
+          g[r][c] = null;
+          changed = true;
+        }
+      }
+    }
+  }
+}
+
 function startBubbleGame() {
   if (!GamePay.consumeRound('bubble-shooter')) return;
 
@@ -73,6 +161,9 @@ function startBubbleGame() {
     frame: 0,
   };
 
+  // 开局自动清理已存在的三消组合和悬空泡泡
+  _cleanupInitialGrid();
+
   // 鼠标/触摸控制
   if (_bubbleMouseHandler) _bubbleCanvas.removeEventListener('mousemove', _bubbleMouseHandler);
   if (_bubbleClickHandler) _bubbleCanvas.removeEventListener('click', _bubbleClickHandler);
@@ -91,8 +182,12 @@ function startBubbleGame() {
 
   _bubbleCanvas.addEventListener('mousemove', _bubbleMouseHandler);
   _bubbleCanvas.addEventListener('click', _bubbleClickHandler);
+
+  // 触摸控制：touchmove 实时更新瞄准，touchend 才发射
+  let _bubbleTouchMoved = false;
   _bubbleCanvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
+    _bubbleTouchMoved = false;
     if (!_bubbleState || _bubbleState.over) return;
     const rect = _bubbleCanvas.getBoundingClientRect();
     const touch = e.touches[0];
@@ -101,6 +196,24 @@ function startBubbleGame() {
     _bubbleState.shooter.angle = Math.atan2(y - _bubbleState.shooter.y, x - _bubbleState.shooter.x);
     if (_bubbleState.shooter.angle > -0.2) _bubbleState.shooter.angle = -0.2;
     if (_bubbleState.shooter.angle < -Math.PI + 0.2) _bubbleState.shooter.angle = -Math.PI + 0.2;
+  }, { passive: false });
+
+  _bubbleCanvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    _bubbleTouchMoved = true;
+    if (!_bubbleState || _bubbleState.over) return;
+    const rect = _bubbleCanvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = (touch.clientX - rect.left) * (BUBBLE_W / rect.width);
+    const y = (touch.clientY - rect.top) * (BUBBLE_H / rect.height);
+    _bubbleState.shooter.angle = Math.atan2(y - _bubbleState.shooter.y, x - _bubbleState.shooter.x);
+    if (_bubbleState.shooter.angle > -0.2) _bubbleState.shooter.angle = -0.2;
+    if (_bubbleState.shooter.angle < -Math.PI + 0.2) _bubbleState.shooter.angle = -Math.PI + 0.2;
+  }, { passive: false });
+
+  _bubbleCanvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    // 如果用户刚滑动过瞄准（touchmove触发），就发射；否则轻点也发射
     _shootBubble();
   }, { passive: false });
 
@@ -134,7 +247,7 @@ function _bubbleLoop() {
 
   // 绘制网格泡泡
   for (let r = 0; r < s.grid.length; r++) {
-    const cols = r % 2 === 0 ? BUBBLE_COLS : BUBBLE_COLS - 1;
+    const cols = s.grid[r].length;
     const offsetX = r % 2 === 0 ? 0 : BUBBLE_R;
     for (let c = 0; c < cols; c++) {
       if (!s.grid[r][c]) continue;
@@ -209,7 +322,7 @@ function _drawBubble(x, y, color) {
 function _checkBubbleCollision(flying) {
   const s = _bubbleState;
   for (let r = 0; r < s.grid.length; r++) {
-    const cols = r % 2 === 0 ? BUBBLE_COLS : BUBBLE_COLS - 1;
+    const cols = s.grid[r].length;
     const offsetX = r % 2 === 0 ? 0 : BUBBLE_R;
     for (let c = 0; c < cols; c++) {
       if (!s.grid[r][c]) continue;
@@ -227,27 +340,28 @@ function _checkBubbleCollision(flying) {
 
 function _snapBubble(flying, hit) {
   const s = _bubbleState;
-  // 计算落点行
   let targetR = hit ? hit.r : 0;
-  // 简单处理：找到最近的空位
-  const row = targetR;
-  const cols = row % 2 === 0 ? BUBBLE_COLS : BUBBLE_COLS - 1;
-  const offsetX = row % 2 === 0 ? 0 : BUBBLE_R;
+  // 找到目标行：若不存在则创建
+  if (!s.grid[targetR]) {
+    const newCols = targetR % 2 === 0 ? BUBBLE_COLS : BUBBLE_COLS - 1;
+    s.grid[targetR] = new Array(newCols).fill(null);
+  }
+  const rowArr = s.grid[targetR];
+  const cols = rowArr.length;
+  const offsetX = targetR % 2 === 0 ? 0 : BUBBLE_R;
   let targetC = Math.round((flying.x - BUBBLE_R - offsetX) / (BUBBLE_R * 2));
   targetC = Math.max(0, Math.min(cols - 1, targetC));
 
-  // 确保行存在
-  if (!s.grid[row]) s.grid[row] = new Array(cols).fill(null);
-  if (!s.grid[row][targetC]) {
-    s.grid[row][targetC] = { color: flying.color };
+  if (!rowArr[targetC]) {
+    rowArr[targetC] = { color: flying.color };
   } else {
     // 找空位
     let placed = false;
     for (let dc = 0; dc < cols && !placed; dc++) {
       for (const sign of [1, -1]) {
         const nc = targetC + sign * dc;
-        if (nc >= 0 && nc < cols && !s.grid[row][nc]) {
-          s.grid[row][nc] = { color: flying.color };
+        if (nc >= 0 && nc < cols && !rowArr[nc]) {
+          rowArr[nc] = { color: flying.color };
           targetC = nc;
           placed = true;
           break;
@@ -255,12 +369,17 @@ function _snapBubble(flying, hit) {
       }
     }
     if (!placed) {
-      // 新增一行
-      s.grid.push(new Array(BUBBLE_COLS).fill(null));
-      const newRow = s.grid.length - 1;
-      s.grid[newRow][0] = { color: flying.color };
-      targetR = newRow;
-      targetC = 0;
+      // 目标行满了，强制在该行后插入新行
+      const newRowIdx = targetR + 1;
+      // 先确保后面的行索引正确，shift所有后续行
+      // 简化方案：直接在grid末尾追加新行，气泡放到那里
+      const newRowActual = s.grid.length;
+      const newCols = newRowActual % 2 === 0 ? BUBBLE_COLS : BUBBLE_COLS - 1;
+      s.grid.push(new Array(newCols).fill(null));
+      const placedIdx = newCols > 0 ? Math.min(1, newCols - 1) : 0;
+      s.grid[s.grid.length - 1][placedIdx] = { color: flying.color };
+      targetR = s.grid.length - 1;
+      targetC = placedIdx;
     }
   }
 
@@ -304,8 +423,7 @@ function _popBubbles(r, c) {
     visited.add(key);
     if (!s.grid[cr] || !s.grid[cr][cc] || s.grid[cr][cc].color !== color) continue;
     toPop.push([cr, cc]);
-    // 邻居（六边形网格）
-    const offset = cr % 2 === 0 ? 0 : -1;
+    const offset = cr % 2 === 0 ? -1 : 0;
     const neighbors = [
       [cr, cc - 1], [cr, cc + 1],
       [cr - 1, cc + offset], [cr - 1, cc + offset + 1],
@@ -315,7 +433,6 @@ function _popBubbles(r, c) {
   }
 
   if (toPop.length >= 3) {
-    const offsetX = r % 2 === 0 ? 0 : BUBBLE_R;
     for (const [pr, pc] of toPop) {
       const x = pc * BUBBLE_R * 2 + BUBBLE_R + (pr % 2 === 0 ? 0 : BUBBLE_R);
       const y = pr * BUBBLE_R * 1.8 + BUBBLE_R;
@@ -325,6 +442,52 @@ function _popBubbles(r, c) {
     s.score += toPop.length * 10;
     const scoreEl = document.getElementById('bubbleScore');
     if (scoreEl) scoreEl.textContent = s.score;
+
+    // === 悬空泡泡掉落 ===
+    // 从顶部行出发 BFS，标记所有通过相邻关系连接到顶部的泡泡
+    const connectedToTop = new Set();
+    const topQ = [];
+    if (s.grid[0]) {
+      for (let cc0 = 0; cc0 < s.grid[0].length; cc0++) {
+        if (s.grid[0][cc0]) { topQ.push([0, cc0]); connectedToTop.add('0,' + cc0); }
+      }
+    }
+    while (topQ.length > 0) {
+      const [cr, cc] = topQ.shift();
+      const offset = cr % 2 === 0 ? -1 : 0;
+      const neighbors = [
+        [cr, cc - 1], [cr, cc + 1],
+        [cr - 1, cc + offset], [cr - 1, cc + offset + 1],
+        [cr + 1, cc + offset], [cr + 1, cc + offset + 1],
+      ];
+      for (const [nr, nc] of neighbors) {
+        if (nr < 0) continue;
+        const key = nr + ',' + nc;
+        if (connectedToTop.has(key)) continue;
+        if (!s.grid[nr] || !s.grid[nr][nc]) continue;
+        connectedToTop.add(key);
+        topQ.push([nr, nc]);
+      }
+    }
+    // 把所有没连到顶部的泡泡清掉并掉落
+    let dropped = 0;
+    for (let rr = 1; rr < s.grid.length; rr++) {
+      if (!s.grid[rr]) continue;
+      for (let cc = 0; cc < s.grid[rr].length; cc++) {
+        const key = rr + ',' + cc;
+        if (s.grid[rr][cc] && !connectedToTop.has(key)) {
+          const x = cc * BUBBLE_R * 2 + BUBBLE_R + (rr % 2 === 0 ? 0 : BUBBLE_R);
+          const y = rr * BUBBLE_R * 1.8 + BUBBLE_R;
+          s.dropping.push({ x, y, vy: 0, life: 60, color: s.grid[rr][cc].color });
+          s.grid[rr][cc] = null;
+          dropped++;
+        }
+      }
+    }
+    if (dropped > 0) {
+      s.score += dropped * 20;
+      if (scoreEl) scoreEl.textContent = s.score;
+    }
   }
 }
 
