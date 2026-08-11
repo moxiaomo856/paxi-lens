@@ -281,7 +281,9 @@ async function executeBatchTransfer() {
 
     const txBody = PaxiCosmJS.TxBody.fromPartial({ messages: allMessages, memo: `Paxi Toolbox Transfer (${total} recipients) | Fee: ${actualFeePaxi} PAXI` });
     const totalGas = allMessages.length * 90000 + 200000;
-    const fee = { amount: [PaxiCosmJS.coins(Math.floor(totalGas * 0.05).toString(), denom)[0]], gasLimit: totalGas };
+    const gasPriceMatch = /^([\d.]+)\s*upaxi$/i.exec((window.SHARED_CONFIG || {}).gasPrice || '0.25upaxi');
+    const gasPricePerUnit = gasPriceMatch ? parseFloat(gasPriceMatch[1]) : 0.25;
+    const fee = { amount: [PaxiCosmJS.coins(Math.floor(totalGas * gasPricePerUnit).toString(), denom)[0]], gasLimit: totalGas };
     const pubkeyBytes = typeof sender.public_key === 'string' ? fromBase64(sender.public_key) : new Uint8Array(sender.public_key);
     const pubkeyAny = { typeUrl: '/cosmos.crypto.secp256k1.PubKey', value: PaxiCosmJS.PubKey.encode({ key: pubkeyBytes }).finish() };
     const authInfo = PaxiCosmJS.AuthInfo.fromPartial({ signerInfos: [{ publicKey: pubkeyAny, modeInfo: { single: { mode: 1 } }, sequence: BigInt(sequence) }], fee });

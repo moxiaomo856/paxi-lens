@@ -65,7 +65,7 @@ function renderGasCalc() {
       </div>
       <div class="form-group">
         <label class="form-label">${t('gasCalc.price')}</label>
-        <input type="number" id="gcGasPrice" value="0.05" step="0.01" min="0">
+        <input type="number" id="gcGasPrice" value="0.25" step="0.01" min="0">
       </div>
       <button class="btn btn-primary" onclick="calculateGas()">${t('gasCalc.calcBtn')}</button>
       <div class="status-msg" id="gcStatus"></div>
