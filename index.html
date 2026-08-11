@@ -597,14 +597,38 @@
 <script src="appjs/tools/address-convert.js"></script>
 <script src="appjs/tools/validator-compare.js"></script>
 <script src="appjs/tools/redelegate.js"></script>
-<script src="appjs/tools/nft-market.js"></script>
-<script src="appjs/tools/p2p-market.js"></script>
+<!-- <script src="appjs/tools/nft-market.js"></script> -->
+<!-- <script src="appjs/tools/p2p-market.js"></script> -->
 <script src="appjs/tools/proposal.js"></script>
 <!-- 主入口（路由 + 初始化） -->
 <script src="app.js"></script>
 <script>
   // 初始化网络选择器（主网/测试网）
   renderNetworkSelector('networkSelector');
+
+  // 首页底部：整站统一免责声明（中英双语）
+  (function () {
+    try {
+      const disclaimerZH = '⚠️ 本网站（及所有子页面）仅供链上数据查询和钱包操作辅助使用。<br>不提供任何代币兑换、交易撮合、定价指引或信息中介服务。<br>用户的一切链上操作均为自主行为，与本网站无关。<br>请遵守您所在国家或地区的法律法规。';
+      const disclaimerEN = '⚠️ This website (and all subpages) is for on-chain data query and wallet assistance only.<br>No token exchange, trading, pricing, or intermediary services are provided.<br>All on-chain actions are your own responsibility.<br>Please comply with the laws of your jurisdiction.';
+      function getLang() { return localStorage.getItem('paxi_lang') || 'zh'; }
+      function render() {
+        let el = document.getElementById('siteDisclaimer');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'siteDisclaimer';
+          el.setAttribute('style', 'max-width:500px;margin:20px auto 0;padding:12px 16px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.8;text-align:center;');
+          const mainEl = document.getElementById('mainContent');
+          if (mainEl && mainEl.parentNode) mainEl.parentNode.insertBefore(el, mainEl.nextSibling);
+          else document.body.appendChild(el);
+        }
+        el.innerHTML = getLang() === 'zh' ? disclaimerZH : disclaimerEN;
+      }
+      render();
+      const origToggle = window.toggleLanguage;
+      window.toggleLanguage = function () { if (origToggle) origToggle(); setTimeout(render, 0); };
+    } catch (e) { console.warn('disclaimer render failed:', e); }
+  })();
 </script>
 </body>
 </html>
