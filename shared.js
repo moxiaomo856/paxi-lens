@@ -355,7 +355,7 @@ async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
       else if (msg.typeUrl?.includes('MsgGrant')) gasSum += 120000;
       else if (msg.typeUrl?.includes('MsgExec')) gasSum += 300000;
       else if (msg.typeUrl?.includes('MsgRevoke')) gasSum += 100000;
-      else if (msg.typeUrl?.includes('MsgSubmitProposal')) gasSum += 350000; // 治理提案消耗较高
+      else if (msg.typeUrl?.includes('MsgSubmitProposal')) gasSum += 500000; // 治理提案消耗较高（实际 ~66w gas）
       else if (msg.typeUrl?.includes('MsgDeposit')) gasSum += 200000;
       else if (msg.typeUrl?.includes('MsgVote')) gasSum += 100000;
       else if (msg.typeUrl?.includes('MsgBeginRedelegate')) gasSum += 200000;
