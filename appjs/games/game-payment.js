@@ -5,6 +5,9 @@
  */
 if (!window.GamePay) window.GamePay = {};
 
+// 付费模式开关（false = 免费体验，true = 付费游玩）
+const GAME_PAY_ENABLED = true;
+
 window.GamePay = {
   FEE: '5',
   ROUNDS: 10,
@@ -12,21 +15,34 @@ window.GamePay = {
 
   // 获取剩余局数
   getRounds(gameId) {
+    if (!GAME_PAY_ENABLED) return 999;
     return parseInt(localStorage.getItem('paxi_game_rounds_' + gameId) || '0', 10);
   },
 
   // 设置局数
   setRounds(gameId, n) {
+    if (!GAME_PAY_ENABLED) return;
     localStorage.setItem('paxi_game_rounds_' + gameId, String(n));
   },
 
   // 钱包是否已连接
   isConnected() {
+    if (!GAME_PAY_ENABLED) return true;
     return (typeof state !== 'undefined' && state.connected);
   },
 
   // 根据状态生成覆盖层 HTML
   overlayHTML(gameId, titleKey, descKey) {
+    // 免费模式：直接显示开始按钮
+    if (!GAME_PAY_ENABLED) {
+      return `
+        <div id="gpOverlayTitle" style="font-size:24px;font-weight:800;color:#fff;margin-bottom:12px;">${t(titleKey)}</div>
+        <div id="gpOverlaySub" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;text-align:center;">${t('gamePay.touchToStart')}</div>
+        <button id="gpStartBtn" class="btn btn-primary" style="min-width:120px;">${t('gamePay.startBtn')}</button>
+      `;
+    }
+
+    // === 以下为付费模式逻辑（暂时注释） ===
     const rounds = this.getRounds(gameId);
     const connected = this.isConnected();
 
@@ -60,6 +76,7 @@ window.GamePay = {
 
   // 生成局数徽章 HTML
   roundsBadge(gameId) {
+    if (!GAME_PAY_ENABLED) return '';
     return `<span style="background:var(--bg);padding:4px 10px;border-radius:6px;font-size:12px;">${t('gamePay.roundsLeft')}: <b id="gpRounds" style="color:var(--warning)">${this.getRounds(gameId)}</b></span>`;
   },
 
@@ -86,6 +103,13 @@ window.GamePay = {
 
   // 开始按钮逻辑分发
   async onStart(gameId, startFn) {
+    // 免费模式：直接开始
+    if (!GAME_PAY_ENABLED) {
+      startFn();
+      return;
+    }
+
+    // === 以下为付费模式逻辑 ===
     if (!this.isConnected()) {
       if (typeof connectWallet === 'function') {
         await connectWallet();
@@ -107,7 +131,7 @@ window.GamePay = {
     startFn();
   },
 
-  // 支付 5 PAXI 获得 10 局
+  // 支付 5 PAXI 获得 10 局（付费模式才调用）
   async payAndStart(gameId, startFn) {
     if (this._paying) return;
     if (!this.isConnected()) {
@@ -143,7 +167,6 @@ window.GamePay = {
       const txHash = res?.tx_response?.txhash;
       if (!txHash) throw new Error('Transaction failed');
 
-      // 等待上链确认
       if (typeof pollTxStatus === 'function') {
         const pollRes = await pollTxStatus(txHash, 25);
         if (!pollRes.confirmed || !pollRes.success) {
@@ -151,22 +174,18 @@ window.GamePay = {
         }
       }
 
-      // 支付成功，增加局数
       const newRounds = this.getRounds(gameId) + this.ROUNDS;
       this.setRounds(gameId, newRounds);
 
-      // 更新 UI
       const roundsEl = document.getElementById('gpRounds');
       if (roundsEl) roundsEl.textContent = newRounds;
 
       showToast(t('gamePay.paySuccess'), 'success');
 
-      // 更新覆盖层
       if (overlayTitle) overlayTitle.textContent = t('gamePay.start');
       if (overlaySub) overlaySub.innerHTML = `${t('gamePay.touchToStart')}<br><span style="color:var(--primary);font-weight:600;">${t('gamePay.roundsLeft')}: ${newRounds}</span>`;
       if (btn) { btn.disabled = false; btn.textContent = t('gamePay.startBtn'); }
 
-      // 自动开始第一局
       startFn();
     } catch (e) {
       showToast(t('gamePay.payFailed') + ': ' + (e.message || e), 'error');
@@ -180,6 +199,13 @@ window.GamePay = {
 
   // 消耗一局（在 startFn 开头调用）
   consumeRound(gameId) {
+    // 免费模式：直接放行
+    if (!GAME_PAY_ENABLED) {
+      const overlay = document.getElementById('gpOverlay');
+      if (overlay) overlay.style.display = 'none';
+      return true;
+    }
+
     const rounds = this.getRounds(gameId);
     if (rounds <= 0) {
       showToast(t('gamePay.noRounds'), 'warning');
@@ -190,7 +216,6 @@ window.GamePay = {
     const roundsEl = document.getElementById('gpRounds');
     if (roundsEl) roundsEl.textContent = rounds - 1;
 
-    // 隐藏覆盖层
     const overlay = document.getElementById('gpOverlay');
     if (overlay) overlay.style.display = 'none';
     return true;
@@ -201,6 +226,7 @@ window.GamePay = {
     const overlay = document.getElementById('gpOverlay');
     if (!overlay) return;
     overlay.style.display = 'flex';
+    if (!GAME_PAY_ENABLED) return;
     const title = document.getElementById('gpOverlayTitle');
     const sub = document.getElementById('gpOverlaySub');
     const btn = document.getElementById('gpStartBtn');
@@ -217,8 +243,13 @@ window.GamePay = {
     const title = document.getElementById('gpOverlayTitle');
     const sub = document.getElementById('gpOverlaySub');
     const btn = document.getElementById('gpStartBtn');
-    const remaining = this.getRounds(gameId);
     if (title) title.textContent = t('gamePay.gameOver');
+    if (!GAME_PAY_ENABLED) {
+      if (sub) sub.innerHTML = scoreHTML;
+      if (btn) btn.textContent = t('gamePay.playAgain');
+      return;
+    }
+    const remaining = this.getRounds(gameId);
     if (sub) sub.innerHTML = `${scoreHTML}<br><span style="font-size:12px;color:var(--text-muted)">${t('gamePay.roundsLeft')}: ${remaining}</span>`;
     if (btn) {
       btn.textContent = remaining > 0 ? t('gamePay.playAgain') : t('gamePay.buyRounds');

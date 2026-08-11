@@ -40,13 +40,33 @@ function renderTetris() {
         </div>
       </div>
       <div style="position:relative;display:flex;justify-content:center;">
-        <canvas id="tetrisCanvas" width="${TETRIS_W}" height="${TETRIS_H}" style="background:#0a0a1a;border-radius:8px;touch-action:none;max-width:100%;"></canvas>
+        <canvas id="tetrisCanvas" width="${TETRIS_W}" height="${TETRIS_H}" style="background:#0a0a1a;border-radius:8px;touch-action:none;max-width:100%;height:auto;"></canvas>
         <div id="gpOverlay" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);border-radius:8px;z-index:10;">
           ${GamePay.overlayHTML('tetris', 'tetris.title', 'tetris.desc')}
         </div>
       </div>
+      <div style="display:flex;gap:12px;justify-content:center;align-items:center;margin-top:14px;flex-wrap:wrap;">
+        <button type="button" id="tetrisBtnLeft" class="tetris-btn" aria-label="${t('tetris.title')} ←">◀</button>
+        <button type="button" id="tetrisBtnRotate" class="tetris-btn" aria-label="${t('tetris.title')} ↻">⟳</button>
+        <button type="button" id="tetrisBtnRight" class="tetris-btn" aria-label="${t('tetris.title')} →">▶</button>
+        <button type="button" id="tetrisBtnDown" class="tetris-btn" aria-label="${t('tetris.title')} ▼">▼</button>
+        <button type="button" id="tetrisBtnDrop" class="tetris-btn" aria-label="${t('tetris.title')} ⤓">⤓</button>
+      </div>
       <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--text-muted);">${t('tetris.controls')}</div>
     </div>
+    <style>
+      .tetris-btn{
+        width:48px;height:48px;border-radius:50%;
+        background:rgba(255,255,255,0.15);
+        border:1px solid rgba(255,255,255,0.3);
+        color:var(--text);font-size:20px;font-weight:bold;
+        cursor:pointer;display:flex;align-items:center;justify-content:center;
+        touch-action:manipulation;user-select:none;-webkit-user-select:none;
+        -webkit-tap-highlight-color:transparent;padding:0;line-height:1;
+        transition:background .1s;
+      }
+      .tetris-btn:active{background:rgba(255,255,255,0.35);}
+    </style>
   `;
 }
 
@@ -114,6 +134,24 @@ function startTetrisGame() {
     }
     touchStart = null;
   };
+
+  // 触屏按钮
+  const bindTetrisBtn = (id, fn) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.onclick = (e) => {
+      e.preventDefault();
+      if (!_tetrisState || _tetrisState.over) return;
+      const p = _tetrisState.current;
+      if (!p) return;
+      fn(p);
+    };
+  };
+  bindTetrisBtn('tetrisBtnLeft', (p) => _moveTetris(p, -1, 0));
+  bindTetrisBtn('tetrisBtnRight', (p) => _moveTetris(p, 1, 0));
+  bindTetrisBtn('tetrisBtnRotate', (p) => _rotateTetris(p));
+  bindTetrisBtn('tetrisBtnDown', (p) => _moveTetris(p, 0, 1));
+  bindTetrisBtn('tetrisBtnDrop', () => _hardDrop());
 
   if (_tetrisAnimId) cancelAnimationFrame(_tetrisAnimId);
   _tetrisAnimId = requestAnimationFrame(_tetrisLoop);

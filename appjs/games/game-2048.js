@@ -21,8 +21,8 @@ function render2048() {
         </div>
       </div>
       <div style="position:relative;display:flex;justify-content:center;">
-        <div id="g2048Board" style="width:320px;height:320px;background:var(--bg);border-radius:8px;padding:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;position:relative;touch-action:none;"></div>
-        <div id="gpOverlay" style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:336px;height:336px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);border-radius:8px;z-index:10;">
+        <div id="g2048Board" style="width:320px;max-width:100%;height:auto;aspect-ratio:1;background:#bbada0;border-radius:8px;padding:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;position:relative;touch-action:none;"></div>
+        <div id="gpOverlay" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);border-radius:8px;z-index:10;">
           ${GamePay.overlayHTML('game-2048', 'g2048.title', 'g2048.desc')}
         </div>
       </div>
@@ -162,10 +162,10 @@ function _render2048Board() {
     for (let c = 0; c < 4; c++) {
       const v = _g2048State.grid[r][c];
       const cell = document.createElement('div');
-      cell.style.cssText = `width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:6px;font-weight:800;transition:all 0.1s;${v <= 4 ? 'color:#776e65;' : 'color:#fff;'}`;
-      const bg = colors[v] || '#3c3a32';
+      cell.style.cssText = `width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:6px;font-weight:800;transition:all 0.1s;border:2px solid rgba(0,0,0,0.25);box-shadow:inset 0 2px 4px rgba(255,255,255,0.3),inset 0 -2px 4px rgba(0,0,0,0.15);${v <= 4 ? 'color:#776e65;' : 'color:#fff;'}`;
+      const bg = v === 0 ? '#cdc1b4' : (colors[v] || '#3c3a32');
       cell.style.background = bg;
-      cell.style.fontSize = v >= 1024 ? '20px' : v >= 128 ? '22px' : '28px';
+      cell.style.fontSize = v >= 1024 ? '18px' : v >= 128 ? '20px' : '26px';
       cell.textContent = v || '';
       board.appendChild(cell);
     }

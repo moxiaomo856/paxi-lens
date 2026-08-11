@@ -34,8 +34,8 @@ function renderKlotski() {
         </div>
       </div>
       <div style="position:relative;display:flex;justify-content:center;">
-        <div id="klotskiBoard" style="width:280px;height:350px;background:#8b6f47;border:3px solid #5c4530;border-radius:8px;position:relative;touch-action:none;"></div>
-        <div id="gpOverlay" style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:286px;height:356px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);border-radius:8px;z-index:10;">
+        <div id="klotskiBoard" style="width:280px;max-width:100%;height:auto;aspect-ratio:4/5;background:#8b6f47;border:3px solid #5c4530;border-radius:8px;position:relative;touch-action:none;"></div>
+        <div id="gpOverlay" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);border-radius:8px;z-index:10;">
           ${GamePay.overlayHTML('klotski', 'klotski.title', 'klotski.desc')}
         </div>
       </div>
@@ -75,6 +75,29 @@ function startKlotskiGame() {
     _tryMoveBlock(_klotskiState.selected, dx, dy);
   };
   window.addEventListener('keydown', _klotskiKeyDown);
+
+  // 触摸滑动控制（手机端）
+  const board = document.getElementById('klotskiBoard');
+  if (board) {
+    let touchStart = null;
+    board.ontouchstart = (e) => {
+      if (!_klotskiState || _klotskiState.won || !_klotskiState.selected) return;
+      touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    };
+    board.ontouchend = (e) => {
+      if (!touchStart || !_klotskiState || _klotskiState.won || !_klotskiState.selected) return;
+      const dx = e.changedTouches[0].clientX - touchStart.x;
+      const dy = e.changedTouches[0].clientY - touchStart.y;
+      const absX = Math.abs(dx), absY = Math.abs(dy);
+      if (Math.max(absX, absY) < 15) { touchStart = null; return; }
+      if (absX > absY) {
+        _tryMoveBlock(_klotskiState.selected, dx > 0 ? 1 : -1, 0);
+      } else {
+        _tryMoveBlock(_klotskiState.selected, 0, dy > 0 ? 1 : -1);
+      }
+      touchStart = null;
+    };
+  }
 }
 
 function _renderKlotskiBoard() {
@@ -82,8 +105,9 @@ function _renderKlotskiBoard() {
   if (!board || !_klotskiState) return;
   board.innerHTML = '';
 
-  const cellW = 280 / 4;
-  const cellH = 350 / 5;
+  // 使用百分比定位，适配手机缩放
+  const cellWPct = 100 / 4;  // 每列 25%
+  const cellHPct = 100 / 5;  // 每行 20%
 
   const colors = { big: '#e74c3c', vert: '#3498db', horiz: '#2ecc71', small: '#f39c12' };
 
@@ -92,10 +116,12 @@ function _renderKlotskiBoard() {
     const isSelected = _klotskiState.selected === b.id;
     el.style.cssText = `
       position:absolute;
-      left:${b.x * cellW + 2}px;
-      top:${b.y * cellH + 2}px;
-      width:${b.w * cellW - 4}px;
-      height:${b.h * cellH - 4}px;
+      left:${b.x * cellWPct}%;
+      top:${b.y * cellHPct}%;
+      width:${b.w * cellWPct}%;
+      height:${b.h * cellHPct}%;
+      padding:2px;
+      box-sizing:border-box;
       background:${colors[b.type]};
       border-radius:6px;
       display:flex;
@@ -103,11 +129,12 @@ function _renderKlotskiBoard() {
       justify-content:center;
       color:#fff;
       font-weight:700;
-      font-size:${b.type === 'big' ? '18px' : '12px'};
+      font-size:${b.type === 'big' ? '16px' : '11px'};
       cursor:pointer;
       box-shadow:${isSelected ? '0 0 0 3px #fff, 0 4px 8px rgba(0,0,0,0.3)' : '0 2px 4px rgba(0,0,0,0.3)'};
       transition:all 0.15s;
       user-select:none;
+      -webkit-tap-highlight-color:transparent;
     `;
     el.textContent = currentLang === 'zh' ? b.name : b.nameEn;
     el.dataset.blockId = b.id;

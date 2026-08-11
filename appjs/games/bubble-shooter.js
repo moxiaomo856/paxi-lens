@@ -29,7 +29,7 @@ function renderBubbleShooter() {
         </div>
       </div>
       <div style="position:relative;display:flex;justify-content:center;">
-        <canvas id="bubbleCanvas" width="${BUBBLE_W}" height="${BUBBLE_H}" style="background:linear-gradient(180deg,#1a1a3a 0%,#0a0a1a 100%);border-radius:8px;touch-action:none;max-width:100%;"></canvas>
+        <canvas id="bubbleCanvas" width="${BUBBLE_W}" height="${BUBBLE_H}" style="background:linear-gradient(180deg,#1a1a3a 0%,#0a0a1a 100%);border-radius:8px;touch-action:none;max-width:100%;height:auto;"></canvas>
         <div id="gpOverlay" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);border-radius:8px;z-index:10;">
           ${GamePay.overlayHTML('bubble-shooter', 'bubble.title', 'bubble.desc')}
         </div>

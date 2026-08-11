@@ -29,10 +29,8 @@ function renderPlaneWar() {
   const connected = (typeof state !== 'undefined' && state.connected);
   const hasRounds = rounds > 0;
 
-  // 根据状态决定覆盖层内容
   let overlayHTML = '';
   if (!connected) {
-    // 未连接钱包
     overlayHTML = `
       <div id="pwOverlayTitle" style="font-size:22px;font-weight:800;color:#fff;margin-bottom:12px;">${t('planeWar.title')}</div>
       <div id="pwOverlaySub" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;text-align:center;line-height:1.8;">
@@ -42,7 +40,6 @@ function renderPlaneWar() {
       <button id="pwStartBtn" class="btn btn-primary" style="min-width:160px;">${t('planeWar.connectFirst')}</button>
     `;
   } else if (!hasRounds) {
-    // 已连接但没次数 → 显示付费
     overlayHTML = `
       <div id="pwOverlayTitle" style="font-size:20px;font-weight:800;color:#fff;margin-bottom:12px;">${t('planeWar.payTitle')}</div>
       <div id="pwOverlaySub" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;text-align:center;line-height:1.8;">
@@ -51,7 +48,6 @@ function renderPlaneWar() {
       <button id="pwStartBtn" class="btn btn-primary" style="min-width:180px;">${t('planeWar.payBtn')}</button>
     `;
   } else {
-    // 有次数 → 可以开始
     overlayHTML = `
       <div id="pwOverlayTitle" style="font-size:24px;font-weight:800;color:#fff;margin-bottom:12px;">${t('planeWar.start')}</div>
       <div id="pwOverlaySub" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;text-align:center;">
@@ -74,7 +70,7 @@ function renderPlaneWar() {
         </div>
       </div>
       <div style="position:relative;display:flex;justify-content:center;">
-        <canvas id="planeWarCanvas" width="360" height="500" style="background:linear-gradient(180deg,#0a0a1a 0%,#1a1a3a 50%,#0a0a1a 100%);border-radius:8px;touch-action:none;max-width:100%;"></canvas>
+        <canvas id="planeWarCanvas" width="360" height="500" style="background:linear-gradient(180deg,#0a0a1a 0%,#1a1a3a 50%,#0a0a1a 100%);border-radius:8px;touch-action:none;max-width:100%;height:auto;"></canvas>
         <div id="pwOverlay" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.7);border-radius:8px;z-index:10;">
           ${overlayHTML}
         </div>
@@ -114,10 +110,8 @@ function bindPlaneWarEvents() {
 async function onPwStartClick() {
   const connected = (typeof state !== 'undefined' && state.connected);
   if (!connected) {
-    // 尝试连接钱包
     if (typeof connectWallet === 'function') {
       await connectWallet();
-      // 连接成功后重新渲染
       if (state.connected) {
         renderTool('plane-war', 'plane-war');
       }
@@ -129,12 +123,10 @@ async function onPwStartClick() {
 
   const rounds = _pwGetRounds();
   if (rounds <= 0) {
-    // 需要付费
     await _pwPayAndStart();
     return;
   }
 
-  // 有次数，直接开始
   startPlaneWarGame();
 }
 
@@ -214,16 +206,12 @@ async function _pwPayAndStart() {
 function startPlaneWarGame() {
   if (!_planeWarCanvas || !_planeWarCtx) return;
 
-  // 检查次数
   const rounds = _pwGetRounds();
   if (rounds <= 0) {
     showToast(t('planeWar.noRounds'), 'warning');
-    // 重新渲染覆盖层为付费状态
     _pwShowPayOverlay();
     return;
   }
-
-  // 扣除 1 局
   _pwSetRounds(rounds - 1);
   const roundsEl = document.getElementById('pwRounds');
   if (roundsEl) roundsEl.textContent = rounds - 1;
@@ -635,7 +623,6 @@ function gameOver() {
   s.gameOver = true;
   if (_planeWarAnimId) cancelAnimationFrame(_planeWarAnimId);
 
-  const remainingRounds = _pwGetRounds();
   const overlay = document.getElementById('pwOverlay');
   if (overlay) {
     overlay.style.display = 'flex';
@@ -643,13 +630,10 @@ function gameOver() {
     const sub = document.getElementById('pwOverlaySub');
     const btn = document.getElementById('pwStartBtn');
     if (title) title.textContent = t('planeWar.gameOver');
+    const remainingRounds = _pwGetRounds();
     if (sub) sub.innerHTML = `${t('planeWar.finalScore')}: <b style="color:var(--primary);font-size:20px;">${s.score}</b><br><span style="font-size:12px;color:var(--text-muted)">${t('planeWar.roundsLeft')}: ${remainingRounds}</span>`;
     if (btn) {
-      if (remainingRounds > 0) {
-        btn.textContent = t('planeWar.playAgain');
-      } else {
-        btn.textContent = t('planeWar.buyRounds');
-      }
+      btn.textContent = remainingRounds > 0 ? t('planeWar.playAgain') : t('planeWar.buyRounds');
     }
   }
 }

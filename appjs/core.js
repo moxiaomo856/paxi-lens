@@ -257,7 +257,7 @@ const LANG = {
       title: '🧩 华容道',
       desc: '经典滑块拼图，移动方块助曹操突围',
       moves: '步数',
-      controls: '👆 点击方块选中，再点方向移动 | ⌨️ 方向键/WASD',
+      controls: '👆 点击方块选中，滑动方向移动 | ⌨️ 方向键/WASD',
       win: '胜利',
     },
     bubble: {
@@ -546,7 +546,7 @@ const LANG = {
       title: '🧩 Klotski',
       desc: 'Classic sliding puzzle, help Cao Cao escape',
       moves: 'Moves',
-      controls: '👆 Tap block to select, then tap direction | ⌨️ Arrow keys/WASD',
+      controls: '👆 Tap block to select, swipe to move | ⌨️ Arrow keys/WASD',
       win: 'Victory',
     },
     bubble: {

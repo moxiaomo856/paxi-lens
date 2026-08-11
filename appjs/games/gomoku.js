@@ -26,7 +26,7 @@ function renderGomoku() {
         </div>
       </div>
       <div style="position:relative;display:flex;justify-content:center;">
-        <canvas id="gomokuCanvas" width="${GOMOKU_W}" height="${GOMOKU_H}" style="background:#dcb35c;border-radius:8px;touch-action:none;max-width:100%;cursor:crosshair;"></canvas>
+        <canvas id="gomokuCanvas" width="${GOMOKU_W}" height="${GOMOKU_H}" style="background:#dcb35c;border-radius:8px;touch-action:none;max-width:100%;height:auto;cursor:crosshair;"></canvas>
         <div id="gpOverlay" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);border-radius:8px;z-index:10;">
           ${GamePay.overlayHTML('gomoku', 'gomoku.title', 'gomoku.desc')}
         </div>
@@ -54,16 +54,17 @@ function startGomokuGame() {
     winner: 0,
     moves: 0,
     aiThinking: false,
+    lastTouchTime: 0, // 防止触摸和点击重复触发
   };
 
   _drawGomokuBoard();
 
-  if (_gomokuClickHandler) _gomokuCanvas.removeEventListener('click', _gomokuClickHandler);
-  _gomokuClickHandler = (e) => {
+  // 统一的落子处理函数
+  const handlePlace = (clientX, clientY) => {
     if (!_gomokuState || _gomokuState.over || _gomokuState.aiThinking || _gomokuState.turn !== 1) return;
     const rect = _gomokuCanvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (GOMOKU_W / rect.width);
-    const y = (e.clientY - rect.top) * (GOMOKU_H / rect.height);
+    const x = (clientX - rect.left) * (GOMOKU_W / rect.width);
+    const y = (clientY - rect.top) * (GOMOKU_H / rect.height);
     const col = Math.round(x / GOMOKU_CELL) - 1;
     const row = Math.round(y / GOMOKU_CELL) - 1;
     if (row < 0 || row >= GOMOKU_SIZE || col < 0 || col >= GOMOKU_SIZE) return;
@@ -93,35 +94,23 @@ function startGomokuGame() {
       _gomokuState.aiThinking = false;
     }, 300);
   };
-  _gomokuCanvas.addEventListener('click', _gomokuClickHandler);
 
-  // 触摸支持
-  _gomokuCanvas.addEventListener('touchend', (e) => {
+  // 触摸事件（移动端优先）
+  _gomokuCanvas.ontouchend = (e) => {
     e.preventDefault();
-    if (!_gomokuState || _gomokuState.over || _gomokuState.aiThinking || _gomokuState.turn !== 1) return;
-    const rect = _gomokuCanvas.getBoundingClientRect();
+    if (!_gomokuState) return;
+    _gomokuState.lastTouchTime = Date.now();
     const touch = e.changedTouches[0];
-    const x = (touch.clientX - rect.left) * (GOMOKU_W / rect.width);
-    const y = (touch.clientY - rect.top) * (GOMOKU_H / rect.height);
-    const col = Math.round(x / GOMOKU_CELL) - 1;
-    const row = Math.round(y / GOMOKU_CELL) - 1;
-    if (row < 0 || row >= GOMOKU_SIZE || col < 0 || col >= GOMOKU_SIZE) return;
-    if (_gomokuState.board[row][col] !== 0) return;
-    _gomokuState.board[row][col] = 1;
-    _gomokuState.moves++;
-    _drawGomokuStone(row, col, 1);
-    if (_checkGomokuWin(row, col, 1)) {
-      _gomokuState.over = true;
-      _gomokuState.winner = 1;
-      setTimeout(() => { GamePay.showGameOver('gomoku', `${t('gomoku.youWin')}! 🎉`); }, 300);
-      return;
-    }
-    _gomokuState.turn = 2;
-    _gomokuState.aiThinking = true;
-    const turnEl = document.getElementById('gomokuTurn');
-    if (turnEl) turnEl.textContent = t('gomoku.ai');
-    setTimeout(() => { _gomokuAI(); _gomokuState.aiThinking = false; }, 300);
-  }, { passive: false });
+    handlePlace(touch.clientX, touch.clientY);
+  };
+
+  // 点击事件（桌面端）
+  _gomokuCanvas.onclick = (e) => {
+    if (!_gomokuState) return;
+    // 如果刚发生过触摸事件，跳过点击（防止双重触发）
+    if (Date.now() - _gomokuState.lastTouchTime < 500) return;
+    handlePlace(e.clientX, e.clientY);
+  };
 }
 
 function _drawGomokuBoard() {
