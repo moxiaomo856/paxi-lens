@@ -61,7 +61,7 @@ const SHARED_CONFIG = {
   get denomDisplay() { return getNetworkConfig().denomDisplay; },
   get lcd() { return getLCD(); },
   get chainId() { return getChainId(); },
-  gasPrice: '0.05upaxi',
+  gasPrice: '0.25upaxi',
   gasLimit: 600000,
   maxMessagesPerTx: 100,
   feeCollector: 'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd',
@@ -358,9 +358,11 @@ async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
   // TxBody
   const txBody = PaxiCosmJS.TxBody.fromPartial({ messages, memo });
 
-  // Fee
+  // Fee - 从 SHARED_CONFIG.gasPrice 解析每 gas 的 upaxi 单价（例：'0.25upaxi' → 0.25）
+  const gasPriceMatch = /^([\d.]+)\s*upaxi$/i.exec(SHARED_CONFIG.gasPrice || '0.25upaxi');
+  const gasPricePerUnit = gasPriceMatch ? parseFloat(gasPriceMatch[1]) : 0.25;
   const fee = {
-    amount: [PaxiCosmJS.coins(Math.floor(totalGas * 0.05).toString(), denom)[0]],
+    amount: [PaxiCosmJS.coins(Math.floor(totalGas * gasPricePerUnit).toString(), denom)[0]],
     gasLimit: BigInt(totalGas),
   };
 
