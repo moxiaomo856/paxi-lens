@@ -12,6 +12,9 @@ function renderTxTracker() {
       <button class="btn btn-primary" onclick="trackTransaction()">${t('txTracker.queryBtn')}</button>
       <div class="status-msg" id="txStatus"></div>
       <div id="txResult" style="margin-top:16px"></div>
+      <div style="margin-top:14px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--text-muted);line-height:1.6;text-align:center;">
+        ${t('disclaimer.txTracker')}
+      </div>
     </div>
   `;
 }
@@ -66,6 +69,9 @@ function renderGasCalc() {
       <div class="form-group">
         <label class="form-label">${t('gasCalc.price')}</label>
         <input type="number" id="gcGasPrice" value="0.25" step="0.01" min="0">
+        <div style="margin-top:6px;padding:6px 10px;background:rgba(99,102,241,0.06);border-radius:4px;font-size:11px;color:var(--text-muted);line-height:1.5;">
+          ${t('disclaimer.gasCalc')}
+        </div>
       </div>
       <button class="btn btn-primary" onclick="calculateGas()">${t('gasCalc.calcBtn')}</button>
       <div class="status-msg" id="gcStatus"></div>

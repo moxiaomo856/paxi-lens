@@ -21,6 +21,7 @@ const LANG = {
       validatorCompare: '验证节点',
       p2pMarket: '买卖发布',
       proposal: '治理提案',
+      games: '游戏娱乐',
       later: '后期开发……'
     },
     batchTransfer: {
@@ -197,6 +198,92 @@ const LANG = {
       redelegate: '本操作仅用于自主管理质押节点，属于链上治理行为，不构成投资建议。',
       nftLauncher: '本工具仅提供 NFT 铸造的技术服务，不提供任何交易撮合、定价或兑换功能。用户自行承担持有和处置 NFT 的一切后果。'
     },
+    games: {
+      title: '🎮 游戏娱乐',
+      desc: '在工具箱内畅玩休闲小游戏，放松一下吧！',
+      comingSoon: '敬请期待更多游戏……'
+    },
+    planeWar: {
+      title: '✈️ 飞机大战',
+      hint: '点击屏幕控制飞机移动，自动射击',
+      score: '分数',
+      hp: '生命',
+      start: '准备就绪',
+      touchToStart: '点击开始游戏',
+      startBtn: '开始游戏',
+      controls: '👆 触摸屏幕移动 | ⌨️ 方向键/WASD 控制',
+      gameOver: '游戏结束',
+      finalScore: '最终分数',
+      playAgain: '再来一局',
+      needWallet: '请先连接钱包再开始游戏',
+      payTitle: '🎮 游戏付费',
+      payDesc: '支付 5 PAXI 即可畅玩 10 局飞机大战',
+      payBtn: '💳 支付 5 PAXI 开始',
+      paying: '支付中...',
+      paySuccess: '支付成功！获得 10 局游戏次数',
+      payFailed: '支付失败',
+      roundsLeft: '剩余局数',
+      noRounds: '剩余局数为 0，请付费续局',
+      buyRounds: '购买次数',
+      connectFirst: '请先连接钱包'
+    },
+    gamePay: {
+      needWallet: '请先连接钱包再开始游戏',
+      payTitle: '🎮 游戏付费',
+      payDesc: '支付 5 PAXI 即可畅玩 10 局',
+      payBtn: '💳 支付 5 PAXI 开始',
+      paying: '支付中...',
+      paySuccess: '支付成功！获得 10 局游戏次数',
+      payFailed: '支付失败',
+      roundsLeft: '剩余局数',
+      noRounds: '剩余局数为 0，请付费续局',
+      buyRounds: '购买次数',
+      connectFirst: '请先连接钱包',
+      start: '准备就绪',
+      touchToStart: '点击开始游戏',
+      startBtn: '开始游戏',
+      gameOver: '游戏结束',
+      finalScore: '最终分数',
+      playAgain: '再来一局',
+    },
+    g2048: {
+      title: '🔢 2048',
+      desc: '合并相同数字，挑战2048！',
+      score: '分数',
+      best: '最高',
+      controls: '⌨️ 方向键/WASD 移动 | 👆 滑动屏幕',
+    },
+    klotski: {
+      title: '🧩 华容道',
+      desc: '经典滑块拼图，移动方块助曹操突围',
+      moves: '步数',
+      controls: '👆 点击方块选中，再点方向移动 | ⌨️ 方向键/WASD',
+      win: '胜利',
+    },
+    bubble: {
+      title: '🫧 泡泡龙',
+      desc: '瞄准发射，消除同色泡泡',
+      score: '分数',
+      controls: '👆 鼠标/触摸瞄准，点击发射',
+      win: '全部消除',
+    },
+    tetris: {
+      title: '🟦 俄罗斯方块',
+      desc: '经典方块消除游戏',
+      score: '分数',
+      lines: '消行',
+      controls: '⌨️ ←→ 移动 | ↑ 旋转 | ↓ 加速 | 空格硬降 | 👆 滑动控制',
+    },
+    gomoku: {
+      title: '⚫ 五子棋',
+      desc: '人机对弈，五子连珠获胜',
+      turn: '当前',
+      you: '你（黑）',
+      ai: 'AI（白）',
+      youWin: '你赢了',
+      aiWin: 'AI赢了',
+      controls: '👆 点击/触摸棋盘落子',
+    },
     common: {
       connectFirst: '请先连接钱包',
       sending: '发送中...',
@@ -223,6 +310,7 @@ const LANG = {
       validatorCompare: 'Validators',
       p2pMarket: 'P2P Market',
       proposal: 'Gov Proposal',
+      games: 'Game Center',
       later: 'Coming Soon…'
     },
     batchTransfer: {
@@ -399,6 +487,92 @@ const LANG = {
       redelegate: 'This operation is only for independent management of staking nodes and is an on-chain governance action, not investment advice.',
       nftLauncher: 'This tool only provides technical services for NFT minting and does not provide any transaction matching, pricing, or exchange functions. Users bear all consequences of holding and disposing of NFTs.'
     },
+    games: {
+      title: '🎮 Game Center',
+      desc: 'Play casual games in the toolbox and have fun!',
+      comingSoon: 'More games coming soon…'
+    },
+    planeWar: {
+      title: '✈️ Plane War',
+      hint: 'Touch/click screen to move plane, auto-fire',
+      score: 'Score',
+      hp: 'HP',
+      start: 'Ready',
+      touchToStart: 'Tap to Start',
+      startBtn: 'Start Game',
+      controls: '👆 Touch screen to move | ⌨️ Arrow keys/WASD to control',
+      gameOver: 'Game Over',
+      finalScore: 'Final Score',
+      playAgain: 'Play Again',
+      needWallet: 'Please connect wallet to play',
+      payTitle: '🎮 Game Payment',
+      payDesc: 'Pay 5 PAXI to play 10 rounds of Plane War',
+      payBtn: '💳 Pay 5 PAXI to Start',
+      paying: 'Paying...',
+      paySuccess: 'Payment success! Got 10 rounds',
+      payFailed: 'Payment failed',
+      roundsLeft: 'Rounds Left',
+      noRounds: 'No rounds left, please pay to continue',
+      buyRounds: 'Buy Rounds',
+      connectFirst: 'Please connect wallet first'
+    },
+    gamePay: {
+      needWallet: 'Please connect wallet to play',
+      payTitle: '🎮 Game Payment',
+      payDesc: 'Pay 5 PAXI to play 10 rounds',
+      payBtn: '💳 Pay 5 PAXI to Start',
+      paying: 'Paying...',
+      paySuccess: 'Payment success! Got 10 rounds',
+      payFailed: 'Payment failed',
+      roundsLeft: 'Rounds Left',
+      noRounds: 'No rounds left, please pay to continue',
+      buyRounds: 'Buy Rounds',
+      connectFirst: 'Please connect wallet first',
+      start: 'Ready',
+      touchToStart: 'Tap to Start',
+      startBtn: 'Start Game',
+      gameOver: 'Game Over',
+      finalScore: 'Final Score',
+      playAgain: 'Play Again',
+    },
+    g2048: {
+      title: '🔢 2048',
+      desc: 'Merge same numbers, reach 2048!',
+      score: 'Score',
+      best: 'Best',
+      controls: '⌨️ Arrow keys/WASD to move | 👆 Swipe screen',
+    },
+    klotski: {
+      title: '🧩 Klotski',
+      desc: 'Classic sliding puzzle, help Cao Cao escape',
+      moves: 'Moves',
+      controls: '👆 Tap block to select, then tap direction | ⌨️ Arrow keys/WASD',
+      win: 'Victory',
+    },
+    bubble: {
+      title: '🫧 Bubble Shooter',
+      desc: 'Aim and shoot, pop same-color bubbles',
+      score: 'Score',
+      controls: '👆 Mouse/touch to aim, click to shoot',
+      win: 'All Cleared',
+    },
+    tetris: {
+      title: '🟦 Tetris',
+      desc: 'Classic block-stacking game',
+      score: 'Score',
+      lines: 'Lines',
+      controls: '⌨️ ←→ Move | ↑ Rotate | ↓ Soft drop | Space Hard drop | 👆 Swipe',
+    },
+    gomoku: {
+      title: '⚫ Gomoku',
+      desc: 'Play vs AI, connect five to win',
+      turn: 'Turn',
+      you: 'You (Black)',
+      ai: 'AI (White)',
+      youWin: 'You Win',
+      aiWin: 'AI Wins',
+      controls: '👆 Click/tap board to place stone',
+    },
     common: {
       connectFirst: 'Please connect wallet first',
       sending: 'Sending...',
@@ -413,6 +587,7 @@ const LANG = {
 };
 
 let currentLang = localStorage.getItem('paxi_lang') || 'zh';
+let navStack = [];
 
 function t(key) {
   const keys = key.split('.');
@@ -514,15 +689,50 @@ function checkWalletInjection() {
 // 导航
 // ============================================================
 function navigateHome() {
+  // Cleanup current tool
+  if (state.currentTool && window.TOOL_REGISTRY && window.TOOL_REGISTRY[state.currentTool]) {
+    if (typeof window.TOOL_REGISTRY[state.currentTool].beforeUnmount === 'function') {
+      window.TOOL_REGISTRY[state.currentTool].beforeUnmount();
+    }
+  }
+  navStack = [];
   state.currentView = 'home';
   state.currentTool = null;
   renderHome();
 }
 
 function navigateToTool(tool) {
+  const prevTool = state.currentTool;
+  // Push current state to stack before navigating
+  if (state.currentView === 'tool') {
+    navStack.push({ view: 'tool', tool: state.currentTool });
+  } else {
+    navStack.push({ view: 'home' });
+  }
   state.currentView = 'tool';
   state.currentTool = tool;
-  renderTool(tool);
+  renderTool(tool, prevTool);
+}
+
+function navigateBack() {
+  // Cleanup current tool
+  if (state.currentTool && window.TOOL_REGISTRY && window.TOOL_REGISTRY[state.currentTool]) {
+    if (typeof window.TOOL_REGISTRY[state.currentTool].beforeUnmount === 'function') {
+      window.TOOL_REGISTRY[state.currentTool].beforeUnmount();
+    }
+  }
+  const prev = navStack.pop();
+  if (!prev || prev.view === 'home') {
+    navStack = [];
+    state.currentView = 'home';
+    state.currentTool = null;
+    renderHome();
+  } else {
+    const prevTool = state.currentTool;
+    state.currentView = 'tool';
+    state.currentTool = prev.tool;
+    renderTool(prev.tool, prevTool);
+  }
 }
 
 // ============================================================
@@ -542,6 +752,7 @@ function renderHome() {
     { id: 'validator-compare', icon: '🏦', label: 'tools.validatorCompare' },
     // { id: 'p2p-market', icon: '📊', label: 'tools.p2pMarket' }, // 合规移除：P2P买卖市场
     { id: 'proposal', icon: '📦', label: 'tools.proposal' },
+    { id: 'games', icon: '🎮', label: 'tools.games' },
     { id: 'later', icon: '📌', label: 'tools.later' },
   ];
 
@@ -654,6 +865,7 @@ window.APP.t = t;
 window.APP.toggleLanguage = toggleLanguage;
 window.APP.updateHeaderUI = updateHeaderUI;
 window.APP.navigateHome = navigateHome;
+window.APP.navigateBack = navigateBack;
 window.APP.navigateToTool = navigateToTool;
 window.APP.renderHome = renderHome;
 window.APP.initApp = initApp;
