@@ -296,33 +296,76 @@ async function fetchAPI(path) {
 }
 
 // ============================================================
-// Gas 模拟（通过 LCD /cosmos/tx/v1beta1/simulate）
-// 安全改进：用实际模拟值替代固定估算
-// ============================================================
-async function simulateGas(txBytesBase64) {
-  try {
-    const res = await fetch(`${getLCD()}/cosmos/tx/v1beta1/simulate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tx_bytes: txBytesBase64 }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const gasUsed = parseInt(data.gas_info?.gas_used || data.gasUsed || '0');
-    if (gasUsed > 0) {
-      // 加 20% 缓冲，防止边缘情况导致 gas 不足
-      return Math.ceil(gasUsed * 1.2);
-    }
-  } catch (e) {
-    console.warn('[Gas] 模拟失败，将使用默认估算:', e.message);
-  }
-  return null;
-}
-
-// ============================================================
 // 交易构建 & 签名 & 广播（通用函数）
 // wallet: { address, public_key, algo } 或 { address, publicKey, connected }
 // ============================================================
+
+// 链上模拟：向节点发一个"空签名"交易，让节点告诉我们真实 gas 消耗
+async function simulateGas(messages, memo, accountNumber, sequence, pubKey, address) {
+  const chainId = getChainId();
+  const denom = getDenom();
+
+  // 构造一个虚拟的 fee（用静态估算兜底，模拟时会被覆盖）
+  let gasSum = 0;
+  for (const msg of messages) {
+    if (msg.typeUrl?.includes('MsgSend')) gasSum += 90000;
+    else if (msg.typeUrl?.includes('MsgExecuteContract')) gasSum += 250000;
+    else if (msg.typeUrl?.includes('MsgInstantiateContract')) gasSum += 500000;
+    else if (msg.typeUrl?.includes('MsgSubmitProposal')) gasSum += 562000;
+    else if (msg.typeUrl?.includes('MsgDeposit')) gasSum += 200000;
+    else if (msg.typeUrl?.includes('MsgVote')) gasSum += 100000;
+    else if (msg.typeUrl?.includes('MsgBeginRedelegate')) gasSum += 200000;
+    else gasSum += 200000;
+  }
+  const dummyGas = gasSum + 100000;
+  const dummyFeeAmount = PaxiCosmJS.coins(Math.floor(dummyGas * 0.25).toString(), denom)[0];
+
+  const pubkeyBytes = typeof pubKey === 'string' ? fromBase64(pubKey) : new Uint8Array(pubKey);
+  const pubkeyAny = {
+    typeUrl: '/cosmos.crypto.secp256k1.PubKey',
+    value: PaxiCosmJS.PubKey.encode({ key: pubkeyBytes }).finish(),
+  };
+
+  const txBody = PaxiCosmJS.TxBody.fromPartial({ messages, memo: memo || '' });
+  const authInfo = PaxiCosmJS.AuthInfo.fromPartial({
+    signerInfos: [{
+      publicKey: pubkeyAny,
+      modeInfo: { single: { mode: 1 } },
+      sequence: BigInt(sequence),
+    }],
+    fee: { amount: [dummyFeeAmount], gasLimit: BigInt(dummyGas) },
+  });
+
+  // 构造一个空签名（32字节零）
+  const emptySig = new Uint8Array(64);
+  const txRaw = PaxiCosmJS.TxRaw.fromPartial({
+    bodyBytes: PaxiCosmJS.TxBody.encode(txBody).finish(),
+    authInfoBytes: PaxiCosmJS.AuthInfo.encode(authInfo).finish(),
+    signatures: [emptySig],
+  });
+
+  const base64Tx = toBase64(PaxiCosmJS.TxRaw.encode(txRaw).finish());
+
+  const res = await fetch(`${getLCD()}/cosmos/tx/v1beta1/simulate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tx_bytes: base64Tx }),
+  });
+
+  if (!res.ok) {
+    // 部分节点 /simulate 不可用，直接抛错让调用者回退
+    throw new Error(`simulate HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  // 返回结构: { gas_info: { gas_used: "12345", gas_wanted: "67890" }, ... }
+  //           或 { gasUsed: "..." }
+  const gasUsed = data.gas_info?.gas_used || data.gasUsed || data.gas_info?.gas_wanted;
+  if (gasUsed && Number(gasUsed) > 0) {
+    return Number(gasUsed);
+  }
+  throw new Error('simulate 返回无有效 gas');
+}
+
 async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
   if (!wallet || !wallet.address) {
     throw new Error('钱包未连接');
@@ -343,10 +386,9 @@ async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
   const chainId = getChainId();
   const denom = getDenom();
 
-  // Gas 计算：优先用传入值，否则按消息类型动态估算
+  // 1) 静态估算（兜底用）
   let totalGas = gasLimit;
   if (!totalGas) {
-    // 按消息类型分别估算
     let gasSum = 0;
     for (const msg of messages) {
       if (msg.typeUrl?.includes('MsgSend')) gasSum += 90000;
@@ -355,13 +397,28 @@ async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
       else if (msg.typeUrl?.includes('MsgGrant')) gasSum += 120000;
       else if (msg.typeUrl?.includes('MsgExec')) gasSum += 300000;
       else if (msg.typeUrl?.includes('MsgRevoke')) gasSum += 100000;
-      else if (msg.typeUrl?.includes('MsgSubmitProposal')) gasSum += 562000; // 治理提案
+      else if (msg.typeUrl?.includes('MsgSubmitProposal')) gasSum += 562000;
       else if (msg.typeUrl?.includes('MsgDeposit')) gasSum += 200000;
       else if (msg.typeUrl?.includes('MsgVote')) gasSum += 100000;
       else if (msg.typeUrl?.includes('MsgBeginRedelegate')) gasSum += 200000;
       else gasSum += 200000;
     }
-    totalGas = gasSum + 100000; // 基础开销
+    totalGas = gasSum + 100000;
+  }
+
+  // 2) 链上模拟（simulate）— 用节点返回的精确 gas 覆盖估算
+  //    避免静态估算不准导致 out of gas
+  if (!gasLimit) {
+    try {
+      const simulatedGas = await simulateGas(messages, memo, accountNumber, sequence, pubKey, wallet.address);
+      if (simulatedGas > 0) {
+        // 模拟值再加 15% 缓冲，防止链上波动
+        totalGas = Math.floor(simulatedGas * 1.15);
+      }
+    } catch (e) {
+      // 模拟失败时回退到静态估算（上面的值）
+      console.warn('[Tx] simulate 失败，使用静态估算:', e.message);
+    }
   }
 
   // TxBody
