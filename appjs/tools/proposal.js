@@ -449,27 +449,55 @@ async function loadProposalList() {
     const lcd = typeof CONFIG !== 'undefined' ? CONFIG.lcd : getLCD();
     let proposals = [];
     let err = null;
-    for (const endpoint of [
-      `${lcd}/cosmos/gov/v1beta1/proposals?pagination.limit=100&pagination.reverse=true`,
-      `${lcd}/cosmos/gov/v1/proposals?pagination.limit=100&pagination.reverse=true`,
-    ]) {
-      try {
-        const res = await fetch(endpoint);
-        if (!res.ok) { err = `HTTP ${res.status}`; continue; }
-        const data = await res.json();
-        proposals = (data.proposals || []).map(p => normalizeProposal(p));
+    // Cosmos SDK gov API 默认只返回 voting_period 的提案
+    // 需要分别查询 deposit_period / voting_period / passed / rejected 才能看到全部
+    const statuses = [
+      'PROPOSAL_STATUS_DEPOSIT_PERIOD',
+      'PROPOSAL_STATUS_VOTING_PERIOD',
+      'PROPOSAL_STATUS_PASSED',
+      'PROPOSAL_STATUS_REJECTED',
+      'PROPOSAL_STATUS_FAILED',
+    ];
+    for (const apiVer of ['/cosmos/gov/v1beta1/proposals', '/cosmos/gov/v1/proposals']) {
+      const all = [];
+      let okCount = 0;
+      for (const st of statuses) {
+        try {
+          const res = await fetch(`${lcd}${apiVer}?proposal_status=${st}&pagination.limit=100&pagination.reverse=true`);
+          if (!res.ok) { continue; }
+          const data = await res.json();
+          all.push(...(data.proposals || []));
+          okCount++;
+        } catch (e) { /* skip */ }
+      }
+      if (okCount > 0) {
+        proposals = all.map(p => normalizeProposal(p));
         break;
-      } catch (e) { err = e.message; }
+      }
+      // 如果分状态查询全部失败，尝试不带 status 查全部
+      if (apiVer === '/cosmos/gov/v1beta1/proposals') {
+        try {
+          const res = await fetch(`${lcd}${apiVer}?pagination.limit=100&pagination.reverse=true`);
+          if (res.ok) {
+            const data = await res.json();
+            proposals = (data.proposals || []).map(p => normalizeProposal(p));
+            break;
+          }
+        } catch (e) {}
+      }
     }
     if (!proposals.length) {
       container.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:20px;">${_t('proposal.listEmpty','暂无提案')}${err ? '<br><span style="font-size:11px;">(' + escapeHtmlSafe(err) + ')</span>' : ''}</p>`;
       return;
     }
     proposals.sort((a, b) => Number(b.proposal_id || b.id || 0) - Number(a.proposal_id || a.id || 0));
+
+    // 先渲染列表（proposer 占位），再异步查询每个提案的发起人
     container.innerHTML = proposals.map(p => {
       const st = statusLabel(p.status);
       const time = p.submit_time || '';
       const deposit = formatDeposit(p.total_deposit || []);
+      const pid = p.proposal_id || p.id || '?';
       const statusBadge = `<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;${
         st.cls === 'success' ? 'background:rgba(82,196,26,.15);color:#52c41a;' :
         st.cls === 'danger' ? 'background:rgba(255,77,79,.15);color:#ff4d4f;' :
@@ -480,19 +508,61 @@ async function loadProposalList() {
       return `
         <div style="border-left:3px solid ${leftColor};background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <div style="font-weight:700;">#${p.proposal_id || p.id || '?'}</div>
+            <div style="font-weight:700;">#${pid}</div>
             ${statusBadge}
           </div>
           <div style="font-size:13px;font-weight:600;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtmlSafe(p.title)}</div>
-          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-muted);">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-muted);margin-bottom:4px;">
             <span>💰 ${deposit}</span>
             <span>📅 ${formatTimeSafe(time)}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);">
+            <span>👤 </span><span id="proposer-${pid}" style="font-family:var(--font-mono,monospace);">查询中...</span>
           </div>
         </div>
       `;
     }).join('');
+
+    // 异步查询每个提案的提议者地址
+    for (const p of proposals) {
+      const pid = p.proposal_id || p.id;
+      if (!pid) continue;
+      fetchProposer(pid, lcd);
+    }
   } catch (e) {
     container.innerHTML = `<p style="color:var(--danger);text-align:center;padding:10px;">加载失败：${escapeHtmlSafe(e.message)}</p>`;
+  }
+}
+
+// 查询提案发起人地址并回填到列表
+async function fetchProposer(proposalId, lcd) {
+  const el = document.getElementById(`proposer-${proposalId}`);
+  if (!el) return;
+  try {
+    let addr = null;
+    // v1beta1: /cosmos/gov/v1beta1/proposals/{id}/proposer → { proposer: "paxi1..." }
+    // v1:      /cosmos/gov/v1/proposals/{id}/proposer      → { proposer: "paxi1..." }
+    for (const apiVer of ['/cosmos/gov/v1beta1/proposals', '/cosmos/gov/v1/proposals']) {
+      try {
+        const res = await fetch(`${lcd}${apiVer}/${proposalId}/proposer`);
+        if (!res.ok) continue;
+        const data = await res.json();
+        addr = data.proposer || (data.proposal && data.proposal.proposer) || null;
+        if (addr) break;
+      } catch (e) { /* try next */ }
+    }
+    if (addr) {
+      // 如果是当前钱包地址，高亮标记
+      const mine = (typeof state !== 'undefined' && state.wallet && state.wallet.address === addr);
+      const short = addr.length > 20 ? addr.slice(0, 12) + '...' + addr.slice(-6) : addr;
+      el.innerHTML = mine
+        ? `<span style="color:var(--primary);font-weight:600;">${short}</span> <span style="background:var(--primary);color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;">我</span>`
+        : `<span title="${addr}">${short}</span>`;
+    } else {
+      el.textContent = '未知';
+    }
+  } catch (e) {
+    el.textContent = '查询失败';
   }
 }
 
