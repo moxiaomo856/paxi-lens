@@ -184,6 +184,19 @@ const LANG = {
       invalidDeposit: '押金必须大于 0',
       confirmSubmit: '确认支付 {fee} PAXI 手续费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。',
     },
+    disclaimer: {
+      siteWide: '⚠️ 本网站（及所有子页面）仅供链上数据查询和钱包操作辅助使用。不提供任何代币兑换、交易撮合、定价指引或信息中介服务。用户的一切链上操作均为自主行为，与本网站无关。请遵守您所在国家或地区的法律法规。',
+      balanceCheck: '本工具仅展示链上公开数据，不涉及任何交易服务。所有数据来源于 Paxi 网络，仅供参考。',
+      txTracker: '本工具仅查询链上交易状态，不提供交易建议或投资建议。',
+      gasCalc: '本估算仅供参考，实际费用以链上执行为准。',
+      validatorCompare: '验证节点数据来源于链上公开信息，仅供参考，不构成投资建议。',
+      prc20Info: '本工具仅展示代币基本信息，不提供价格或交易服务。',
+      proposalSubmit: '本工具仅提供提案提交的技术入口。提案内容由用户自行撰写和负责。用户应确保提案内容符合所在司法管辖区的法律法规。',
+      proposalList: '提案列表来自链上公开数据，内容由提案人自行负责。',
+      batchTransfer: '⚠️ 本功能仅用于个人钱包资产管理，不得用于商业支付、代币兑换或任何形式的虚拟货币交易服务。用户的一切转账行为均为自主操作，与本工具无关。',
+      redelegate: '本操作仅用于自主管理质押节点，属于链上治理行为，不构成投资建议。',
+      nftLauncher: '本工具仅提供 NFT 铸造的技术服务，不提供任何交易撮合、定价或兑换功能。用户自行承担持有和处置 NFT 的一切后果。'
+    },
     common: {
       connectFirst: '请先连接钱包',
       sending: '发送中...',
@@ -373,6 +386,19 @@ const LANG = {
       invalidDeposit: 'Deposit must be greater than 0',
       confirmSubmit: 'Confirm to pay {fee} PAXI platform fee + {deposit} PAXI deposit? Deposit will be refunded if proposal passes.',
     },
+    disclaimer: {
+      siteWide: '⚠️ This website (and all subpages) is for on-chain data query and wallet operation assistance only. It does not provide any token exchange, transaction matching, pricing guidance, or information intermediary services. All user on-chain operations are independent actions and unrelated to this website. Please comply with the laws and regulations of your country or region.',
+      balanceCheck: 'This tool only displays on-chain public data and does not involve any trading services. All data is sourced from the Paxi network and is for reference only.',
+      txTracker: 'This tool only queries on-chain transaction status and does not provide trading advice or investment recommendations.',
+      gasCalc: 'This estimate is for reference only; the actual fee is subject to on-chain execution.',
+      validatorCompare: 'Validator data is sourced from on-chain public information and is for reference only, not investment advice.',
+      prc20Info: 'This tool only displays basic token information and does not provide price or trading services.',
+      proposalSubmit: 'This tool only provides a technical entry for submitting proposals. The proposal content is written and responsible by the user. Users should ensure that the proposal content complies with the laws and regulations of their jurisdiction.',
+      proposalList: 'The proposal list is from on-chain public data, and the content is the responsibility of the proposer.',
+      batchTransfer: '⚠️ This function is only for personal wallet asset management and must not be used for commercial payments, token exchange, or any form of virtual currency trading services. All user transfer actions are independent operations and unrelated to this tool.',
+      redelegate: 'This operation is only for independent management of staking nodes and is an on-chain governance action, not investment advice.',
+      nftLauncher: 'This tool only provides technical services for NFT minting and does not provide any transaction matching, pricing, or exchange functions. Users bear all consequences of holding and disposing of NFTs.'
+    },
     common: {
       connectFirst: 'Please connect wallet first',
       sending: 'Sending...',
@@ -507,14 +533,14 @@ function renderHome() {
   const tools = [
     { id: 'batch-transfer', icon: '📤', label: 'tools.batchTransfer' },
     { id: 'balance-check', icon: '💰', label: 'tools.balanceCheck' },
-    { id: 'nft-market', icon: '🏪', label: 'tools.nftMarket' },
+    // { id: 'nft-market', icon: '🏪', label: 'tools.nftMarket' }, // 合规移除：NFT市场
     { id: 'tx-tracker', icon: '🔍', label: 'tools.txTracker' },
     { id: 'nft-launcher', icon: '🎨', label: 'tools.nftLauncher' },
     { id: 'address-convert', icon: '🔄', label: 'tools.addressConvert' },
     { id: 'redelegate', icon: '🔄', label: 'tools.redelegate' },
     { id: 'gas-calc', icon: '⛽', label: 'tools.gasCalc' },
     { id: 'validator-compare', icon: '🏦', label: 'tools.validatorCompare' },
-    { id: 'p2p-market', icon: '📊', label: 'tools.p2pMarket' },
+    // { id: 'p2p-market', icon: '📊', label: 'tools.p2pMarket' }, // 合规移除：P2P买卖市场
     { id: 'proposal', icon: '📦', label: 'tools.proposal' },
     { id: 'later', icon: '📌', label: 'tools.later' },
   ];
