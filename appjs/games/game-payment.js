@@ -6,7 +6,7 @@
 if (!window.GamePay) window.GamePay = {};
 
 // 付费模式开关（false = 免费体验，true = 付费游玩）
-const GAME_PAY_ENABLED = false;
+const GAME_PAY_ENABLED = true;
 
 window.GamePay = {
   FEE: '5',

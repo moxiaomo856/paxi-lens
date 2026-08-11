@@ -1,64 +1,149 @@
 /**
- * NFT Launcher (Inline Version)
- * 内嵌版 NFT 发射工具 - 取消跳转，直接在工具箱内展示
- * 支持：集合部署、批量铸造、合约历史、中英文双语
+ * NFT Launcher (Inline Version - FULL)
+ * 内嵌版 NFT 发射工具 - 恢复原始完整功能
+ * 支持：步骤向导部署、封面图上传、批量铸造、元数据生成、合约历史
  */
 if (!window.TOOL_REGISTRY) window.TOOL_REGISTRY = {};
 
 const _NFT_LANG = {
   zh: {
     title: '🎨 NFT 发射平台',
-    desc: '一键部署 PRC-721 NFT 合约到 Paxi 网络，支持批量铸造。',
+    desc: '一键部署 PRC-721 NFT 合约到 Paxi 网络。部署后可直接批量铸造 NFT。',
+    // Steps
+    step1: '合集信息',
+    step2: '上传素材',
+    step3: '预览 & 部署',
+    next: '下一步：上传素材 →',
+    prev: '← 上一步',
+    nextDeploy: '下一步：预览 & 部署 →',
+    // Deploy
     deploy: '部署 NFT 合约',
-    batchMint: '批量铸造 NFT',
-    contractHistory: '已部署的合约',
-    contractAddr: 'NFT 合约地址',
     collectionName: '合集名称',
     symbol: '合集符号',
+    description: '合集描述',
     maxSupply: '最大供应量',
-    mint: '铸造数量',
+    royalty: '版税比例 (%)',
+    mintPrice: 'Mint 价格 (PAXI)',
+    maxPerWallet: '每地址最大 Mint 数',
     deployBtn: '🚀 部署 NFT 合约',
+    // Upload
+    uploadCover: 'NFT 封面图（仅用于本地预览，不存入链上）',
+    uploadCoverHint: '点击上传封面图',
+    uploadSupport: '支持 JPG/PNG/GIF/SVG',
+    imageUri: '图片 IPFS/Arweave URI（可选，测试中可不填）',
+    // Preview
+    preview: '预览',
+    previewPlaceholder: '🖼️',
+    // Batch mint
+    batchMint: '批量铸造 NFT',
+    batchMintDesc: '向已部署的 PRC-721 合约批量铸造 NFT。单次最多铸造 10 个，每个 NFT 将生成唯一 Token ID。',
+    contractAddr: 'NFT 合约地址',
+    contractAddrHint: '生成后自动填入',
+    mint: '铸造数量',
+    mintFeeTitle: '💰 预估费用',
+    mintCountLabel: '铸造数量',
+    estimatedFee: '预计费用',
     mintBtn: '🏭 执行批量铸造',
-    calcFee: '💰 预估费用',
-    fee: '平台手续费',
-    warning: '⚠️ 本工具仅提供 NFT 铸造的技术服务，不提供任何交易撮合、定价或兑换功能。用户自行承担持有和处置 NFT 的一切后果。',
+    mintTokenIds: 'Token IDs',
+    blockHeight: '区块高度',
+    // Metadata
+    metadataTitle: '📝 自定义元数据存储',
+    metadataDesc: '为已铸造的 NFT 添加自定义名称和图片。生成符合 CW721 标准的元数据 JSON。',
+    tokenId: 'Token ID',
+    nftName: 'NFT 名称',
+    imageUriLabel: '图片 URI',
+    saveMetadataBtn: '📝 生成元数据 JSON',
+    metadataExplain: 'PRC-721 通过 token_uri 指向外部 JSON 管理元数据。请将以下 JSON 上传到你的服务器或 IPFS，然后在铸造时使用该 URL 作为 token_uri。',
+    copyJson: '📋 复制 JSON',
+    // History
+    contractHistory: '已部署的合约',
+    contractHistoryDesc: '已成功部署到 Paxi 链上的 NFT 合约记录。',
+    noHistory: '暂无已部署的合约',
+    toContract: '→ 填入合约地址',
+    // Status
     needWallet: '请先连接钱包',
-    fillAll: '请完整填写信息',
+    fillAll: '请完整填写必填信息',
     deploying: '构建部署交易...',
     waiting: '等待钱包签名...',
-    broadcasting: '等待上链确认...',
+    broadcasting: '交易已广播，等待上链确认...',
+    confirmWait: '等待上链确认...',
     success: '✅ 操作成功',
     failed: '❌ 操作失败',
-    noHistory: '暂无已部署的合约',
-    nextStep: '👇 下一步：复制合约地址到上方铸造框',
+    deploySuccess: '✅ NFT 合约部署成功！',
+    nextStep: '👇 下一步：复制上方地址，粘贴到下方的【批量铸造】输入框中',
+    mintSuccess: '成功铸造',
+    nftMintCount: '个 NFT',
     connected: '已连接',
+    warning: '⚠️ 本工具仅提供 NFT 铸造的技术服务，不提供任何交易撮合、定价或兑换功能。用户自行承担持有和处置 NFT 的一切后果。',
+    warningEn: '⚠️ This tool only provides technical services for NFT minting. No trading, pricing, or exchange functions are offered. Users bear all consequences.',
+    // Misc
+    max10Hint: '单次最多铸造 10 个 NFT',
+    buildTx: '构建铸造交易...',
   },
   en: {
     title: '🎨 NFT Launcher',
-    desc: 'Deploy PRC-721 NFT contracts to Paxi Network with one click. Supports batch minting.',
+    desc: 'Deploy PRC-721 NFT contracts to Paxi Network with one click. Batch mint after deployment.',
+    step1: 'Collection Info',
+    step2: 'Upload Assets',
+    step3: 'Preview & Deploy',
+    next: 'Next: Upload →',
+    prev: '← Back',
+    nextDeploy: 'Next: Preview & Deploy →',
     deploy: 'Deploy NFT Contract',
-    batchMint: 'Batch Mint NFT',
-    contractHistory: 'Deployed Contracts',
-    contractAddr: 'NFT Contract Address',
     collectionName: 'Collection Name',
     symbol: 'Symbol',
+    description: 'Description',
     maxSupply: 'Max Supply',
-    mint: 'Mint Count',
+    royalty: 'Royalty (%)',
+    mintPrice: 'Mint Price (PAXI)',
+    maxPerWallet: 'Max Mint per Wallet',
     deployBtn: '🚀 Deploy NFT Contract',
+    uploadCover: 'NFT Cover (local preview only, not on-chain)',
+    uploadCoverHint: 'Click to upload cover image',
+    uploadSupport: 'JPG/PNG/GIF/SVG supported',
+    imageUri: 'Image IPFS/Arweave URI (optional)',
+    preview: 'Preview',
+    previewPlaceholder: '🖼️',
+    batchMint: 'Batch Mint NFT',
+    batchMintDesc: 'Batch mint NFTs to a deployed PRC-721 contract. Max 10 per tx. Each NFT gets a unique Token ID.',
+    contractAddr: 'NFT Contract Address',
+    contractAddrHint: 'Auto-filled after deployment',
+    mint: 'Mint Count',
+    mintFeeTitle: '💰 Estimate Fee',
+    mintCountLabel: 'Mint Count',
+    estimatedFee: 'Estimated Fee',
     mintBtn: '🏭 Execute Batch Mint',
-    calcFee: '💰 Estimate Fee',
-    fee: 'Platform Fee',
-    warning: '⚠️ This tool only provides technical services for NFT minting. No trading, pricing, or exchange functions are offered. Users bear all consequences.',
+    mintTokenIds: 'Token IDs',
+    blockHeight: 'Block Height',
+    metadataTitle: '📝 Custom Metadata',
+    metadataDesc: 'Add custom name & image for minted NFTs. Generates CW721-compliant metadata JSON.',
+    tokenId: 'Token ID',
+    nftName: 'NFT Name',
+    imageUriLabel: 'Image URI',
+    saveMetadataBtn: '📝 Generate Metadata JSON',
+    metadataExplain: 'PRC-721 manages metadata via token_uri pointing to external JSON. Upload the JSON below to your server/IPFS and use its URL as token_uri when minting.',
+    copyJson: '📋 Copy JSON',
+    contractHistory: 'Deployed Contracts',
+    contractHistoryDesc: 'Successfully deployed NFT contracts on Paxi chain.',
+    noHistory: 'No deployed contracts',
+    toContract: '→ Fill Address',
     needWallet: 'Please connect wallet first',
-    fillAll: 'Please fill in all fields',
-    deploying: 'Building deploy transaction...',
+    fillAll: 'Please fill in all required fields',
+    deploying: 'Building deploy tx...',
     waiting: 'Waiting for wallet signature...',
-    broadcasting: 'Waiting for confirmation...',
+    broadcasting: 'Tx broadcasted. Waiting for confirmation...',
+    confirmWait: 'Waiting for on-chain confirmation...',
     success: '✅ Success',
     failed: '❌ Failed',
-    noHistory: 'No deployed contracts',
-    nextStep: '👇 Next: Copy contract address to mint field above',
+    deploySuccess: '✅ NFT Contract Deployed!',
+    nextStep: '👇 Next: Copy the address above into the Batch Mint field below',
+    mintSuccess: 'Successfully minted',
+    nftMintCount: 'NFTs',
     connected: 'Connected',
+    warning: '⚠️ This tool only provides technical services for NFT minting. No trading, pricing, or exchange functions are offered. Users bear all consequences.',
+    warningEn: '⚠️ This tool only provides technical services for NFT minting. No trading, pricing, or exchange functions are offered. Users bear all consequences.',
+    max10Hint: 'Max 10 NFTs per transaction',
+    buildTx: 'Building mint tx...',
   }
 };
 
@@ -67,8 +152,12 @@ function _nftL(k) {
   return (_NFT_LANG[lang] && _NFT_LANG[lang][k]) || (_NFT_LANG.en[k] || k);
 }
 
+// Internal state
+let _nftStep = 1;
+let _nftCoverBase64 = null;
 let _nftDeployed = JSON.parse(localStorage.getItem('paxi_nft_deployed') || '[]');
 
+// ========== RENDER ==========
 function renderNftLauncher() {
   const walletAddr = (state && state.wallet) ? state.wallet.address : '';
   const connected = (state && state.connected);
@@ -79,13 +168,32 @@ function renderNftLauncher() {
       <div class="card-title">${l('title')}</div>
       <div class="tool-desc">${l('desc')}</div>
       <div style="margin:0 0 12px;padding:10px 12px;background:rgba(255,255,0,0.08);border:1px solid rgba(255,215,0,0.2);border-radius:6px;font-size:11px;color:var(--text-muted);line-height:1.6;">
-        ${l('warning')}
+        ${l('warning')}<br>
+        <span style="font-size:10px;opacity:0.85;">${l('warningEn')}</span>
       </div>
       ${connected ? `<div style="font-size:11px;color:var(--success);margin-bottom:10px;">✓ ${l('connected')}: <code>${walletAddr.slice(0,12)}...</code></div>` : `<div style="font-size:11px;color:var(--warning);margin-bottom:10px;">⚠ ${l('needWallet')}</div>`}
 
-      <!-- Deploy Section -->
-      <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:12px;">
-        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📦 ${l('deploy')}</div>
+      <!-- STEPS INDICATOR -->
+      <div style="display:flex;gap:6px;margin-bottom:20px;align-items:center;justify-content:center;flex-wrap:wrap;">
+        <div id="nft-step-1" style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--primary);">
+          <span style="width:28px;height:28px;border-radius:50%;background:rgba(168,85,247,0.15);border:2px solid var(--primary);color:var(--primary);display:flex;align-items:center;justify-content:center;">1</span>
+          ${l('step1')}
+        </div>
+        <span style="color:var(--text-muted);">→</span>
+        <div id="nft-step-2" style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-muted);">
+          <span style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;">2</span>
+          ${l('step2')}
+        </div>
+        <span style="color:var(--text-muted);">→</span>
+        <div id="nft-step-3" style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--text-muted);">
+          <span style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;">3</span>
+          ${l('step3')}
+        </div>
+      </div>
+
+      <!-- STEP 1: Collection Info -->
+      <div id="nft-panel-1" style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📦 ${l('step1')}</div>
         <div class="form-group">
           <label class="form-label">${l('collectionName')} *</label>
           <input type="text" id="nftName" placeholder="Paxi Punks" maxlength="50">
@@ -95,62 +203,247 @@ function renderNftLauncher() {
           <input type="text" id="nftSymbol" placeholder="PUNK" maxlength="20" style="text-transform:uppercase">
         </div>
         <div class="form-group">
-          <label class="form-label">${l('maxSupply')}</label>
-          <input type="number" id="nftMaxSupply" placeholder="2026" min="1" value="2026">
+          <label class="form-label">${l('description')}</label>
+          <textarea id="nftDescription" placeholder="" maxlength="500" style="min-height:64px;"></textarea>
         </div>
-        <button class="btn btn-primary btn-block" id="btnDeploy" style="margin-top:8px;" ${connected ? '' : 'disabled'}>${l('deployBtn')}</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">${l('maxSupply')}</label>
+            <input type="number" id="nftMaxSupply" placeholder="2026" min="1" value="2026">
+          </div>
+          <div class="form-group">
+            <label class="form-label">${l('royalty')}</label>
+            <input type="number" id="nftRoyalty" placeholder="7.5" min="0" max="20" step="0.1" value="7.5">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">${l('mintPrice')}</label>
+            <input type="number" id="nftMintPrice" placeholder="10" min="0" step="0.01" value="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">${l('maxPerWallet')}</label>
+            <input type="number" id="nftMaxPerWallet" placeholder="10" min="1" value="10">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" id="btnGoStep2" ${connected ? '' : 'disabled'}>${l('next')}</button>
+      </div>
+
+      <!-- STEP 2: Upload -->
+      <div id="nft-panel-2" style="display:none;background:var(--bg);border-radius:8px;padding:14px;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🖼️ ${l('step2')}</div>
+        <div class="form-group">
+          <label class="form-label">${l('uploadCover')}</label>
+          <div id="uploadCoverArea" style="border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all 0.15s;" onclick="document.getElementById('fileCover').click()">
+            <div style="font-size:32px;margin-bottom:8px">🖼️</div>
+            <div>${l('uploadCoverHint')}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">${l('uploadSupport')}</div>
+            <img id="coverPreview" style="width:100px;height:100px;border-radius:12px;object-fit:cover;border:2px solid var(--border);margin:10px auto 0;display:none;">
+          </div>
+          <input type="file" id="fileCover" accept="image/*" style="display:none">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${l('imageUri')}</label>
+          <input type="text" id="nftImageUri" placeholder="https://...">
+        </div>
+        <div style="display:flex;gap:12px;">
+          <button class="btn btn-outline" style="flex:1;" id="btnGoStep1">${l('prev')}</button>
+          <button class="btn btn-primary" style="flex:1;" id="btnGoStep3">${l('nextDeploy')}</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Preview & Deploy -->
+      <div id="nft-panel-3" style="display:none;background:var(--bg);border-radius:8px;padding:14px;margin-bottom:12px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">👀 ${l('step3')}</div>
+        <div id="previewCard" style="background:var(--bg-card);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--border);">
+          <img id="previewImage" src="" alt="NFT Preview" style="width:160px;height:160px;border-radius:12px;object-fit:cover;margin:0 auto 10px;display:none;">
+          <div id="previewPlaceholder" style="width:160px;height:160px;background:var(--bg);border-radius:12px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:40px;">🖼️</div>
+          <h3 id="previewName" style="font-size:15px;margin-bottom:4px;">-</h3>
+          <p id="previewSymbol" style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">-</p>
+          <p id="previewDesc" style="font-size:12px;color:var(--text-muted);margin-top:4px;">-</p>
+        </div>
+        <div style="margin-top:20px;display:flex;gap:12px;">
+          <button class="btn btn-outline" style="flex:1;" id="btnStep3Prev">${l('prev')}</button>
+          <button class="btn btn-success" id="btnDeploy" style="flex:1.5;" ${connected ? '' : 'disabled'}>${l('deployBtn')}</button>
+        </div>
         <div class="status-msg" id="nftDeployStatus"></div>
       </div>
+    </div>
 
-      <!-- Mint Section -->
-      <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:12px;">
-        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🏭 ${l('batchMint')}</div>
-        <div class="form-group">
-          <label class="form-label">${l('contractAddr')} *</label>
-          <input type="text" id="mintContractAddr" placeholder="paxi1...">
-        </div>
-        <div class="form-group">
-          <label class="form-label">${l('mint')} *</label>
-          <input type="number" id="mintCount" placeholder="5" min="1" max="10" value="5">
-        </div>
-        <div id="mintFeePreview" style="display:none;margin-bottom:10px;padding:10px;background:var(--bg-card);border-radius:6px;font-size:12px;">
-          <span style="color:var(--text-muted)">${l('fee')}: </span><span id="mintFeeDisplay" style="color:var(--primary);font-weight:600;">-</span>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-outline btn-sm" id="btnCalcFee" ${connected ? '' : 'disabled'}>${l('calcFee')}</button>
-          <button class="btn btn-success btn-sm" id="btnBatchMint" ${connected ? '' : 'disabled'}>${l('mintBtn')}</button>
-        </div>
-        <div class="status-msg" id="nftMintStatus"></div>
+    <!-- Batch Mint -->
+    <div class="card">
+      <div class="card-title">🏭 ${l('batchMint')}</div>
+      <div class="tool-desc">${l('batchMintDesc')}</div>
+      <div class="form-group">
+        <label class="form-label">${l('contractAddr')} * (${l('contractAddrHint')})</label>
+        <input type="text" id="mintContractAddr" placeholder="paxi1...">
       </div>
-
-      <!-- History Section -->
-      <div style="background:var(--bg);border-radius:8px;padding:14px;">
-        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📜 ${l('contractHistory')}</div>
-        <div id="nftDeployedList">
-          ${_nftDeployed.length === 0 ? `<p style="color:var(--text-muted);font-size:12px">${l('noHistory')}</p>` : _nftDeployed.map(c => `
-            <div style="background:var(--bg-card);border-radius:6px;padding:10px;margin-bottom:6px;font-size:12px;">
-              <strong>${escapeHtml(c.name)}</strong> (${escapeHtml(c.symbol)})
-              <div style="color:var(--text-muted);font-size:10px;margin-top:3px;">${c.contractAddr}</div>
-              <button class="btn btn-outline btn-sm" style="margin-top:4px;padding:2px 8px;font-size:10px;" onclick="document.getElementById('mintContractAddr').value='${c.contractAddr}'">→ ${_nftL('contractAddr')}</button>
-            </div>
-          `).join('')}
+      <div class="form-group">
+        <label class="form-label">${l('mint')} *</label>
+        <input type="number" id="mintCount" placeholder="5" min="1" max="10" value="5">
+      </div>
+      <div id="mintFeePreview" style="display:none;margin-bottom:16px;">
+        <div style="background:var(--bg);border-radius:8px;padding:14px 18px;font-size:13px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="color:var(--text-muted)">${l('mintCountLabel')}</span>
+            <span id="mfCount">-</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border);font-weight:700;">
+            <span>${l('estimatedFee')}</span>
+            <span id="mfTotal" style="color:var(--success)">-</span>
+          </div>
         </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-sm" id="btnCalcFee" ${connected ? '' : 'disabled'}>${l('mintFeeTitle')}</button>
+        <button class="btn btn-success btn-sm" id="btnBatchMint" ${connected ? '' : 'disabled'}>${l('mintBtn')}</button>
+      </div>
+      <div class="status-msg" id="nftMintStatus"></div>
+    </div>
+
+    <!-- Metadata -->
+    <div class="card">
+      <div class="card-title">📝 ${l('metadataTitle')}</div>
+      <div class="tool-desc">${l('metadataDesc')}</div>
+      <div class="form-group">
+        <label class="form-label">${l('contractAddr')} *</label>
+        <input type="text" id="metaContractAddr" placeholder="paxi1...">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">${l('tokenId')} *</label>
+          <input type="text" id="metaTokenId" placeholder="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${l('nftName')}</label>
+          <input type="text" id="metaName" placeholder="Paxi Punk #1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${l('imageUriLabel')}</label>
+        <input type="text" id="metaImage" placeholder="https://...">
+      </div>
+      <button class="btn btn-primary btn-block" id="btnMetadata">${l('saveMetadataBtn')}</button>
+      <div class="status-msg" id="metaStatus"></div>
+    </div>
+
+    <!-- Deployed Contracts -->
+    <div class="card">
+      <div class="card-title">📜 ${l('contractHistory')}</div>
+      <div class="tool-desc">${l('contractHistoryDesc')}</div>
+      <div id="nftDeployedList">
+        ${_nftDeployed.length === 0 ? `<p style="color:var(--text-muted);font-size:12px">${l('noHistory')}</p>` : _renderDeployedItems()}
       </div>
     </div>
   `;
 }
 
+function _renderDeployedItems() {
+  const l = _nftL;
+  return _nftDeployed.map(c => `
+    <div style="background:var(--bg);border-radius:6px;padding:10px;margin-bottom:6px;font-size:12px;border:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div style="min-width:0;flex:1;">
+          <strong style="font-size:13px;">${escapeHtml(c.name || '?')}</strong>
+          <span style="color:var(--text-muted);"> (${escapeHtml(c.symbol || '?')})</span>
+          <div style="color:var(--text-muted);font-size:10px;margin-top:3px;word-break:break-all;">
+            ${l('contractAddr')}: <code style="color:var(--primary)">${c.contractAddr || '-'}</code>
+          </div>
+          ${c.maxSupply ? `<div style="color:var(--text-muted);font-size:10px;">Max: ${c.maxSupply}${c.royalty ? ` · 版税: ${c.royalty}%` : ''}${c.mintPrice ? ` · Mint价: ${c.mintPrice}` : ''}</div>` : ''}
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" style="margin-top:6px;padding:2px 8px;font-size:10px;" onclick="document.getElementById('mintContractAddr').value='${c.contractAddr || ''}'">→ ${l('contractAddr')}</button>
+    </div>
+  `).join('');
+}
+
+// ========== NAVIGATION STEPS ==========
+function _nftGoStep(step) {
+  const l = _nftL;
+  if (step === 2 && _nftStep === 1) {
+    const name = document.getElementById('nftName').value.trim();
+    const symbol = document.getElementById('nftSymbol').value.trim();
+    if (!name || !symbol) { showToast(l('fillAll'), 'warning'); return; }
+  }
+  _nftStep = step;
+  for (let i = 1; i <= 3; i++) {
+    const p = document.getElementById('nft-panel-' + i);
+    if (p) p.style.display = (i === step) ? '' : 'none';
+    const sEl = document.getElementById('nft-step-' + i);
+    if (!sEl) continue;
+    // reset
+    sEl.style.color = i === step ? 'var(--primary)' : (i < step ? 'var(--success)' : 'var(--text-muted)');
+    const badge = sEl.querySelector('span');
+    if (badge) {
+      badge.style.background = i === step ? 'rgba(168,85,247,0.15)' : (i < step ? 'rgba(34,197,94,0.15)' : 'var(--bg)');
+      badge.style.borderColor = i === step ? 'var(--primary)' : (i < step ? 'var(--success)' : 'var(--border)');
+      badge.style.color = i === step ? 'var(--primary)' : (i < step ? 'var(--success)' : '');
+    }
+  }
+  if (step === 3) _nftUpdatePreview();
+}
+
+function _nftUpdatePreview() {
+  document.getElementById('previewName').textContent = document.getElementById('nftName').value || '-';
+  document.getElementById('previewSymbol').textContent = document.getElementById('nftSymbol').value || '-';
+  document.getElementById('previewDesc').textContent = document.getElementById('nftDescription').value || '-';
+  const img = document.getElementById('previewImage');
+  const ph = document.getElementById('previewPlaceholder');
+  if (_nftCoverBase64) {
+    img.src = _nftCoverBase64;
+    img.style.display = 'block';
+    ph.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    ph.style.display = 'flex';
+  }
+}
+
+// ========== BIND EVENTS ==========
 function bindNftLauncherEvents() {
   setTimeout(() => {
+    // Step nav
+    const btnG2 = document.getElementById('btnGoStep2');
+    const btnG1 = document.getElementById('btnGoStep1');
+    const btnG3 = document.getElementById('btnGoStep3');
+    const btnS3P = document.getElementById('btnStep3Prev');
+    if (btnG2) btnG2.addEventListener('click', () => _nftGoStep(2));
+    if (btnG1) btnG1.addEventListener('click', () => _nftGoStep(1));
+    if (btnG3) btnG3.addEventListener('click', () => _nftGoStep(3));
+    if (btnS3P) btnS3P.addEventListener('click', () => _nftGoStep(2));
+
+    // Upload
+    const fileEl = document.getElementById('fileCover');
+    if (fileEl) fileEl.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          _nftCoverBase64 = ev.target.result;
+          const prev = document.getElementById('coverPreview');
+          if (prev) { prev.src = _nftCoverBase64; prev.style.display = 'block'; }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Deploy
     const btnDeploy = document.getElementById('btnDeploy');
+    if (btnDeploy) btnDeploy.addEventListener('click', () => _deployNft());
+
+    // Mint
     const btnMint = document.getElementById('btnBatchMint');
     const btnCalc = document.getElementById('btnCalcFee');
-    if (btnDeploy) btnDeploy.addEventListener('click', () => _deployNft());
     if (btnMint) btnMint.addEventListener('click', () => _mintNft());
     if (btnCalc) btnCalc.addEventListener('click', () => _calcMintFee());
+
+    // Metadata
+    const btnMeta = document.getElementById('btnMetadata');
+    if (btnMeta) btnMeta.addEventListener('click', () => _genMetadata());
   }, 100);
 }
 
+// ========== DEPLOY ==========
 async function _deployNft() {
   if (!state || !state.connected) { showToast(_nftL('needWallet'), 'error'); return; }
   const name = document.getElementById('nftName').value.trim();
@@ -163,27 +456,23 @@ async function _deployNft() {
   btn.innerHTML = '<span class="spinner"></span> ' + _nftL('deploying');
 
   try {
-    const lcd = CONFIG.lcd;
-    const denom = CONFIG.denom;
     const addr = state.wallet.address;
-
     const initMsg = JSON.stringify({ name, symbol, minter: addr });
     const instantiateMsg = PaxiCosmJS.MsgInstantiateContract.fromPartial({
       sender: addr,
-      admin: addr,
+      admin: '',
       codeId: 2,
-      label: `PaxiNFT-${name}-${Date.now()}`,
+      label: `Paxi NFT - ${name} (${Date.now()})`,
       msg: new TextEncoder().encode(initMsg),
       funds: [],
     });
-
     const messages = [PaxiCosmJS.Any.fromPartial({
       typeUrl: '/cosmwasm.wasm.v1.MsgInstantiateContract',
       value: PaxiCosmJS.MsgInstantiateContract.encode(instantiateMsg).finish(),
     })];
 
     btn.innerHTML = '<span class="spinner"></span> ' + _nftL('waiting');
-    const memo = `Deploy PRC-721: ${name}`;
+    const memo = `Deploy PRC-721: ${name} (${symbol})`;
     const res = await buildSignAndBroadcast(messages, memo, null, state.wallet);
 
     const txHash = res?.tx_response?.txhash;
@@ -196,45 +485,51 @@ async function _deployNft() {
     const txResp = res?.tx_response || res;
     if (txResp.code !== undefined && txResp.code !== 0) throw new Error(txResp.raw_log || 'Failed');
 
-    // Poll for confirmation
+    let pollRes = { success: true };
     if (typeof pollTxStatus === 'function') {
-      const info = await pollTxStatus(txHash, 25);
-      if (!info || !info.confirmed || !info.success) throw new Error(info?.rawLog || 'Failed');
+      btn.innerHTML = '<span class="spinner"></span> ' + _nftL('confirmWait');
+      pollRes = await pollTxStatus(txHash, 25);
+      if (!pollRes || !pollRes.confirmed || !pollRes.success) throw new Error(pollRes?.rawLog || 'Failed');
     }
 
-    // Extract contract address
     let contractAddr = null;
     const evs = (res?.tx_response || res)?.events || [];
     for (const ev of evs) {
       if (ev.type === 'instantiate') {
         for (const attr of ev.attributes || []) {
-          if (attr.key === '_contract_address') {
-            contractAddr = attr.value;
-            break;
-          }
+          if (attr.key === '_contract_address') { contractAddr = attr.value; break; }
         }
       }
       if (contractAddr) break;
     }
 
+    const l = _nftL;
+    const maxSupply = parseInt(document.getElementById('nftMaxSupply').value) || 2026;
+    const royalty = parseFloat(document.getElementById('nftRoyalty').value) || 7.5;
+    const mintPrice = parseFloat(document.getElementById('nftMintPrice').value) || 0;
+    const maxPerWallet = parseInt(document.getElementById('nftMaxPerWallet').value) || 10;
+
     statusEl.className = 'status-msg success';
     statusEl.style.display = 'block';
     statusEl.innerHTML = `
-      <strong>✅ ${_nftL('success')}</strong><br>
-      <strong>${_nftL('contractAddr')}:</strong> <code style="word-break:break-all;color:var(--primary)">${contractAddr || txHash}</code><br>
-      <span style="font-size:11px;">Tx: <code style="font-size:11px">${escapeHtml(txHash)}</code></span><br>
-      <span style="font-size:11px;color:var(--text-muted)">${_nftL('nextStep')}</span>
+      <strong>${l('deploySuccess')}</strong><br><br>
+      <strong>${l('collectionName')}:</strong> ${escapeHtml(name)}<br>
+      <strong>${l('contractAddr')}:</strong> <code style="word-break:break-all;color:var(--primary)">${contractAddr || txHash}</code><br>
+      <span style="font-size:11px">Tx: <code style="font-size:11px">${escapeHtml(txHash)}</code></span>${pollRes && pollRes.height ? `<br><span style="font-size:11px">${l('blockHeight')}: <code>${pollRes.height}</code></span>` : ''}<br><br>
+      <span style="font-size:11px;color:var(--text-muted)">${l('nextStep')}</span>
     `;
 
-    // Save to history
     if (contractAddr) {
-      _nftDeployed.unshift({ name, symbol, contractAddr, timestamp: Date.now() });
+      _nftDeployed.unshift({
+        name, symbol, maxSupply, royalty, mintPrice, maxPerWallet,
+        contractAddr, timestamp: Date.now()
+      });
       localStorage.setItem('paxi_nft_deployed', JSON.stringify(_nftDeployed));
       _refreshDeployedList();
       document.getElementById('mintContractAddr').value = contractAddr;
     }
 
-    showToast(_nftL('success'), 'success');
+    showToast(l('success'), 'success');
   } catch (e) {
     statusEl.className = 'status-msg error';
     statusEl.style.display = 'block';
@@ -246,17 +541,18 @@ async function _deployNft() {
   }
 }
 
+// ========== BATCH MINT ==========
 async function _mintNft() {
   if (!state || !state.connected) { showToast(_nftL('needWallet'), 'error'); return; }
   const contractAddr = document.getElementById('mintContractAddr').value.trim();
   const count = parseInt(document.getElementById('mintCount').value) || 0;
   if (!contractAddr || count < 1) { showToast(_nftL('fillAll'), 'warning'); return; }
-  if (count > 10) { showToast('Max 10 per tx', 'warning'); return; }
+  if (count > 10) { showToast(_nftL('max10Hint'), 'warning'); return; }
 
   const btn = document.getElementById('btnBatchMint');
   const statusEl = document.getElementById('nftMintStatus');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> ' + _nftL('deploying');
+  btn.innerHTML = '<span class="spinner"></span> ' + _nftL('buildTx');
 
   try {
     const addr = state.wallet.address;
@@ -265,7 +561,7 @@ async function _mintNft() {
 
     for (let i = 0; i < count; i++) {
       const tokenId = `${timestamp}_${i}`;
-      const mintMsg = { mint: { token_id: tokenId, owner: addr, token_uri: '' } };
+      const mintMsg = { mint: { token_id: tokenId, owner: addr, token_uri: `https://example.com/meta/${timestamp}_${i}.json` } };
       const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
         sender: addr,
         contract: contractAddr,
@@ -278,7 +574,7 @@ async function _mintNft() {
       }));
     }
 
-    // Platform fee (5 PAXI per batch)
+    // Platform fee (5 PAXI fixed per batch)
     const feeAmount = paxiToUpaxi('5');
     const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
       fromAddress: addr,
@@ -302,18 +598,24 @@ async function _mintNft() {
     const txResp = res?.tx_response || res;
     if (txResp.code !== undefined && txResp.code !== 0) throw new Error(txResp.raw_log || 'Failed');
 
+    let pollRes = { success: true, height: null };
     if (typeof pollTxStatus === 'function') {
-      const info = await pollTxStatus(txHash, 25);
-      if (!info || !info.confirmed || !info.success) throw new Error(info?.rawLog || 'Failed');
+      btn.innerHTML = '<span class="spinner"></span> ' + _nftL('confirmWait');
+      pollRes = await pollTxStatus(txHash, 25);
+      if (!pollRes || !pollRes.confirmed || !pollRes.success) throw new Error(pollRes?.rawLog || 'Failed');
     }
 
+    const l = _nftL;
     statusEl.className = 'status-msg success';
     statusEl.style.display = 'block';
     statusEl.innerHTML = `
-      <strong>✅ ${_nftL('success')}: ${count} NFTs</strong><br>
+      <strong>✅ ${l('mintSuccess')} ${count} ${l('nftMintCount')}</strong><br>
+      <strong>${l('mintTokenIds')}:</strong><br>
+      <code style="word-break:break-all;font-size:11px;">${Array.from({ length: count }, (_, i) => `${timestamp}_${i}`).join(', ')}</code><br>
       <span style="font-size:11px">Tx: <code style="font-size:11px">${escapeHtml(txHash)}</code></span>
+      ${pollRes && pollRes.height ? `<br><span style="font-size:11px">${l('blockHeight')}: <code>${pollRes.height}</code></span>` : ''}
     `;
-    showToast(`${count} NFTs minted`, 'success');
+    showToast(`${l('mintSuccess')} ${count} ${l('nftMintCount')}`, 'success');
   } catch (e) {
     statusEl.className = 'status-msg error';
     statusEl.style.display = 'block';
@@ -326,26 +628,53 @@ async function _mintNft() {
 }
 
 function _calcMintFee() {
+  const l = _nftL;
   const count = parseInt(document.getElementById('mintCount').value) || 0;
   if (count < 1) return;
-  const totalFee = (5 * count).toFixed(2);
-  document.getElementById('mintFeeDisplay').textContent = `${totalFee} PAXI`;
+  // Fixed 5 PAXI per batch (not multiplied by count)
+  const totalFee = '5.00';
+  document.getElementById('mfCount').textContent = count + ' ' + l('nftMintCount');
+  document.getElementById('mfTotal').textContent = `${totalFee} PAXI (平台费) + 少量 Gas`;
   document.getElementById('mintFeePreview').style.display = 'block';
 }
 
+// ========== METADATA ==========
+function _genMetadata() {
+  const l = _nftL;
+  const contractAddr = document.getElementById('metaContractAddr').value.trim();
+  const tokenId = document.getElementById('metaTokenId').value.trim();
+  if (!contractAddr || !tokenId) { showToast(l('fillAll'), 'warning'); return; }
+
+  const name = document.getElementById('metaName').value.trim();
+  const image = document.getElementById('metaImage').value.trim();
+
+  const metadata = {
+    name: name || `NFT #${tokenId}`,
+    image: image || '',
+    external_url: '',
+    attributes: []
+  };
+  const jsonStr = JSON.stringify(metadata, null, 2);
+
+  const statusEl = document.getElementById('metaStatus');
+  statusEl.className = 'status-msg success';
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = `
+    <strong>${l('success')}</strong><br><br>
+    <span style="font-size:12px;color:var(--text-muted);line-height:1.6;">${l('metadataExplain')}</span><br><br>
+    <pre style="background:var(--bg);padding:12px;border-radius:8px;overflow-x:auto;font-size:12px;white-space:pre-wrap;">${escapeHtml(jsonStr)}</pre>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent).then(()=>typeof showToast==='function'?showToast('Copied','success'):null)">${l('copyJson')}</button>
+  `;
+  showToast(l('success'), 'success');
+}
+
+// ========== HISTORY ==========
 function _refreshDeployedList() {
   const container = document.getElementById('nftDeployedList');
   if (!container) return;
-  const l = _nftL;
   container.innerHTML = _nftDeployed.length === 0
-    ? `<p style="color:var(--text-muted);font-size:12px">${l('noHistory')}</p>`
-    : _nftDeployed.map(c => `
-        <div style="background:var(--bg-card);border-radius:6px;padding:10px;margin-bottom:6px;font-size:12px;">
-          <strong>${escapeHtml(c.name)}</strong> (${escapeHtml(c.symbol)})
-          <div style="color:var(--text-muted);font-size:10px;margin-top:3px;word-break:break-all;">${c.contractAddr}</div>
-          <button class="btn btn-outline btn-sm" style="margin-top:4px;padding:2px 8px;font-size:10px;" onclick="document.getElementById('mintContractAddr').value='${c.contractAddr}'">→ ${l('contractAddr')}</button>
-        </div>
-      `).join('');
+    ? `<p style="color:var(--text-muted);font-size:12px">${_nftL('noHistory')}</p>`
+    : _renderDeployedItems();
 }
 
 window.TOOL_REGISTRY['nft-launcher'] = {
