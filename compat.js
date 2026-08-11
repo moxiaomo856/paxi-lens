@@ -357,6 +357,44 @@
   };
 
   // ============================================================
+  // ParamChange 编码 — 参数修改提案中的单个参数项
+  // protobuf: cosmos.params.v1beta1.ParamChange
+  // { string subspace = 1; string key = 2; string value = 3; }
+  // ============================================================
+  const ParamChange = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const parts = [];
+      if (data.subspace) parts.push(encodeLenDelim(1, data.subspace));
+      if (data.key) parts.push(encodeLenDelim(2, data.key));
+      if (data.value != null) parts.push(encodeLenDelim(3, String(data.value)));
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
+  // ParameterChangeProposal 编码 — 治理参数修改提案
+  // protobuf: cosmos.params.v1beta1.ParameterChangeProposal
+  // { string title = 1; string description = 2; repeated ParamChange changes = 3; }
+  // ============================================================
+  const ParameterChangeProposal = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const parts = [
+        encodeLenDelim(1, data.title || ''),
+        encodeLenDelim(2, data.description || ''),
+      ];
+      if (data.changes && Array.isArray(data.changes)) {
+        for (const c of data.changes) {
+          const cBytes = ParamChange.encode(c).finish();
+          parts.push(encodeLenDelim(3, cBytes));
+        }
+      }
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
   // MsgSubmitProposal 编码 — 治理提交提案
   // protobuf: cosmos.gov.v1beta1.MsgSubmitProposal
   // { Any content = 1; repeated Coin initial_deposit = 2; string proposer = 3; }
@@ -408,6 +446,8 @@
       MsgMigrateContract,
       MsgBeginRedelegate,
       TextProposal,
+      ParamChange,
+      ParameterChangeProposal,
       MsgSubmitProposal,
     };
 
