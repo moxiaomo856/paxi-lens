@@ -70,9 +70,14 @@ const SHARED_CONFIG = {
   nftMarket: {
     listingFee: 2,
     buyFeeRate: 1,
-    grantDurationSec: 300,  // Authz 授权有效期缩短至 5 分钟（原 1 小时，安全改进）
+    grantDurationSec: 300,
     listingDurationSec: 86400,
     msgTypeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+  },
+  // 治理提案配置
+  governance: {
+    submitFee: 50,          // 工具手续费（PAXI），以后要调就改这里
+    defaultDeposit: 100,    // 默认押金（PAXI）
   },
 };
 

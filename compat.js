@@ -340,6 +340,50 @@
   };
 
   // ============================================================
+  // TextProposal 编码 — 治理文本提案内容
+  // protobuf: cosmos.gov.v1beta1.TextProposal
+  // { string title = 1; string description = 2; }
+  // ============================================================
+  const TextProposal = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      return {
+        finish: () => concatBytes(
+          encodeLenDelim(1, data.title || ''),
+          encodeLenDelim(2, data.description || ''),
+        ),
+      };
+    },
+  };
+
+  // ============================================================
+  // MsgSubmitProposal 编码 — 治理提交提案
+  // protobuf: cosmos.gov.v1beta1.MsgSubmitProposal
+  // { Any content = 1; repeated Coin initial_deposit = 2; string proposer = 3; }
+  // ============================================================
+  const MsgSubmitProposal = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const parts = [];
+      if (data.content) {
+        const anyBytes = AnyEncode.encode(data.content).finish();
+        parts.push(encodeLenDelim(1, anyBytes));
+      }
+      if (data.initial_deposit || data.initialDeposit) {
+        const deposit = data.initial_deposit || data.initialDeposit || [];
+        for (const coin of deposit) {
+          const coinBytes = encodeCoin(coin.denom, coin.amount);
+          parts.push(encodeLenDelim(2, coinBytes));
+        }
+      }
+      if (data.proposer) {
+        parts.push(encodeLenDelim(3, data.proposer));
+      }
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
   // 兼容层入口：检测并补充缺失的类
   // ============================================================
   function applyCompat() {
@@ -363,6 +407,8 @@
       MsgUpdateAdmin,
       MsgMigrateContract,
       MsgBeginRedelegate,
+      TextProposal,
+      MsgSubmitProposal,
     };
 
     let added = [];
