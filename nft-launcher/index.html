@@ -291,6 +291,10 @@
         <p id="previewSymbol">-</p>
         <p id="previewDesc" style="font-size:12px;color:var(--text-muted);margin-top:4px">-</p>
       </div>
+      <div style="margin:16px 0;padding:10px 12px;background:rgba(255,255,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:6px;font-size:12px;color:#ffd700;line-height:1.6;">
+        ⚠️ 本工具仅提供 NFT 铸造的技术服务，不提供任何交易撮合、定价或兑换功能。用户自行承担持有和处置 NFT 的一切后果。<br>
+        <span style="font-size:11px;opacity:0.85;">This tool only provides technical services for NFT minting. No trading, pricing, or exchange functions are offered. Users bear all consequences of holding and disposing of NFTs.</span>
+      </div>
       <div style="margin-top:20px">
         <button class="btn btn-success" id="btnDeploy" onclick="deployNFTContract()">
           🚀 部署 NFT 合约
@@ -375,6 +379,18 @@
     <div id="deployedContracts">
       <p style="color:var(--text-muted);font-size:13px">暂无已部署的合约</p>
     </div>
+  </div>
+
+  <!-- 整站统一免责声明 -->
+  <div style="max-width:500px;margin:20px auto 0;padding:12px 16px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.8;text-align:center;">
+    ⚠️ 本网站（及所有子页面）仅供链上数据查询和钱包操作辅助使用。<br>
+    不提供任何代币兑换、交易撮合、定价指引或信息中介服务。<br>
+    用户的一切链上操作均为自主行为，与本网站无关。<br>
+    请遵守您所在国家或地区的法律法规。<br>
+    <span style="opacity:0.75;">⚠️ This website (and all subpages) is for on-chain data query and wallet assistance only.<br>
+    No token exchange, trading, pricing, or intermediary services are provided.<br>
+    All on-chain actions are your own responsibility.<br>
+    Please comply with the laws of your jurisdiction.</span>
   </div>
 </main>
 
