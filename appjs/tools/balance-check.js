@@ -20,6 +20,9 @@ function renderBalanceCheck() {
       <div class="card-title">${t('balanceCheck.records')}</div>
       <div id="txHistoryContainer"></div>
     </div>
+    <div style="margin:16px 0 0;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.7;text-align:center;">
+      ${t('disclaimer.balanceCheck')}
+    </div>
   `;
 }
 

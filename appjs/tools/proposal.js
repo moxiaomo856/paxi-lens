@@ -114,6 +114,10 @@ function renderProposal() {
           <span style="color:var(--primary);font-weight:700;font-size:15px;">${cfg.submitFee} PAXI</span>
         </div>
 
+        <div style="margin:0 0 12px;padding:8px 12px;background:rgba(255,255,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:6px;font-size:12px;color:#ffd700;line-height:1.6;">
+          ${t('disclaimer.proposalSubmit')}
+        </div>
+
         <button class="btn btn-primary" id="proposalSubmitBtn" style="width:100%;font-weight:700;font-size:14px;min-height:42px;" onclick="submitProposal()">
           🚀 ${_t('proposal.submitBtn','提交提案')}
         </button>
@@ -123,6 +127,9 @@ function renderProposal() {
 
     <div class="card">
       <div class="card-title">${_t('proposal.list','提案列表')}</div>
+      <div style="margin:0 0 12px;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:6px;font-size:11px;color:var(--text-muted);line-height:1.6;">
+        ${t('disclaimer.proposalList')}
+      </div>
       <div id="proposalList"><p style="color:var(--text-muted);text-align:center;padding:20px;">${_t('proposal.listLoading','加载中...')}</p></div>
     </div>
   `;

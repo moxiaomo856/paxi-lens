@@ -61,6 +61,9 @@ function renderBatchTransfer() {
           </table>
         </div>
       </div>
+      <div style="margin:14px 0 4px;padding:10px 12px;background:rgba(255,255,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:6px;font-size:12px;color:#ffd700;line-height:1.6;">
+        ${t('disclaimer.batchTransfer')}
+      </div>
       <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap">
         <button class="btn btn-primary" id="btParseBtn" onclick="parseBatchTransfer()">${t('batchTransfer.parseBtn')}</button>
         <button class="btn btn-success" id="btSendBtn" style="display:none" onclick="executeBatchTransfer()">${t('batchTransfer.sendBtn')}</button>

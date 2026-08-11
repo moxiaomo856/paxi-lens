@@ -8,6 +8,9 @@ function renderValidatorCompare() {
       <button class="btn btn-primary" onclick="loadValidatorData()">${t('validatorCompare.loadBtn')}</button>
       <div class="status-msg" id="vcStatus"></div>
       <div id="vcResults" style="margin-top:16px"></div>
+      <div style="margin-top:14px;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--text-muted);line-height:1.7;text-align:center;">
+        ${t('disclaimer.validatorCompare')}
+      </div>
     </div>
   `;
 }
@@ -66,6 +69,9 @@ function renderTokenInfo() {
       <button class="btn btn-primary" onclick="queryTokenInfo()">${t('tokenInfo.queryBtn')}</button>
       <div class="status-msg" id="tiStatus"></div>
       <div id="tiResult" style="margin-top:16px"></div>
+      <div id="tiDisclaimer" style="display:none;margin-top:12px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--text-muted);line-height:1.6;text-align:center;">
+        ${t('disclaimer.prc20Info')}
+      </div>
     </div>
   `;
 }
@@ -111,6 +117,8 @@ async function queryTokenInfo() {
       `;
       showStatus('tiStatus', '', '');
       document.getElementById('tiStatus').style.display = 'none';
+      const tiDisc = document.getElementById('tiDisclaimer');
+      if (tiDisc) tiDisc.style.display = 'block';
     } else {
       showStatus('tiStatus', '⚠️ 无法查询该合约信息（可能不是 PRC-20 合约）', 'warning');
     }

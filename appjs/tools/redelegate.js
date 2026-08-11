@@ -38,6 +38,9 @@ function renderRedelegate() {
           <span id="rdFeeDisplay" style="color:var(--primary);font-weight:600;">-</span>
         </div>
       </div>
+      <div style="margin:0 0 12px;padding:8px 12px;background:rgba(255,255,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:6px;font-size:12px;color:#ffd700;line-height:1.6;">
+        ${t('disclaimer.redelegate')}
+      </div>
       <button class="btn btn-success btn-block" id="btnRedelegate" onclick="executeRedelegate()">
         ${t('redelegate.execute')}
       </button>
