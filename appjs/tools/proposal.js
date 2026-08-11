@@ -307,27 +307,61 @@ async function submitProposal() {
 
     const summary = `[${type === 'text' ? 'Text' : 'ParamChange'} Proposal] ${title.substring(0, 40)}`;
     const res = await buildSignAndBroadcast(messages, summary, null, state.wallet);
-    const txHash = res && res.txhash;
+
+    // 检查广播结果 — 结构是 { tx_response: { txhash, code, raw_log } } 或 { txhash, code, raw_log }
+    const txResp = res?.tx_response || res;
+    const txHash = txResp?.txhash;
+    const txCode = txResp?.code;
+    const txRawLog = txResp?.raw_log || res?.message || '';
+
+    // 广播同步返回 code≠0 说明交易直接被拒绝（序列化/签名/gas 问题）
+    if (txCode !== undefined && txCode !== 0) {
+      throw new Error(`交易失败 (code=${txCode}): ${txRawLog}`);
+    }
+
     showStatus('proposalStatus', `📡 已广播，等待确认 (tx: ${txHash ? txHash.slice(0,12)+'...' : '-'})`, 'info');
 
-    // 轮询获取 proposal_id
+    // 轮询确认交易是否真正上链
     let proposalId = null;
+    let txConfirmed = false;
+    let txErrorMessage = '';
     if (typeof pollTxStatus === 'function' && txHash) {
       try {
         const info = await pollTxStatus(txHash, 25);
-        if (info && info.events) {
-          for (const ev of info.events) {
-            if (ev.type === 'submit_proposal' && ev.attributes) {
-              for (const attr of ev.attributes) {
-                const k = attr.key ? (typeof atob === 'function' ? atob(attr.key) : attr.key) : '';
-                const v = attr.value ? (typeof atob === 'function' ? atob(attr.value) : attr.value) : '';
-                if (k === 'proposal_id') { proposalId = v; break; }
+        if (info) {
+          if (info.confirmed && info.success) {
+            txConfirmed = true;
+            if (info.events) {
+              for (const ev of info.events) {
+                if (ev.type === 'submit_proposal' && ev.attributes) {
+                  for (const attr of ev.attributes) {
+                    const k = attr.key ? (typeof atob === 'function' ? atob(attr.key) : attr.key) : '';
+                    const v = attr.value ? (typeof atob === 'function' ? atob(attr.value) : attr.value) : '';
+                    if (k === 'proposal_id') { proposalId = v; break; }
+                  }
+                }
+                if (proposalId) break;
               }
             }
-            if (proposalId) break;
+          } else if (info.confirmed && !info.success) {
+            // 交易上链了但执行失败（比如参数错误、权限不足等）
+            txErrorMessage = info.rawLog || `code=${info.code}`;
+          } else {
+            txErrorMessage = '超时未确认（可能 gas 不足或网络拥堵）';
           }
+        } else {
+          txErrorMessage = '超时未确认';
         }
-      } catch (e) { /* ignore */ }
+      } catch (e) {
+        txErrorMessage = e.message || String(e);
+      }
+    }
+
+    if (!txConfirmed) {
+      const failMsg = _t('proposal.fail','❌ 提案提交失败：') + (txErrorMessage || '交易未上链确认');
+      showStatus('proposalStatus', failMsg, 'error');
+      showToast(failMsg, 'error');
+      return;
     }
 
     const okText = _t('proposal.success','✅ 提案提交成功！提案 ID：') + (proposalId || '（已上链，请在下方列表查看）');
