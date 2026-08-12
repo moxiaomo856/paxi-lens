@@ -633,6 +633,7 @@ const CONFIG = {
   maxMessagesPerTx: SHARED_CONFIG.maxMessagesPerTx,
   feeCollector: SHARED_CONFIG.feeCollector,
   feeRate: SHARED_CONFIG.feeRate,
+  batchTransfer: SHARED_CONFIG.batchTransfer,
   nftMarket: SHARED_CONFIG.nftMarket,
 };
 

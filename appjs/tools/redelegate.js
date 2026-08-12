@@ -56,15 +56,20 @@ async function loadRedelegateData() {
   }
   try {
     const address = state.wallet.address;
-    const delRes = await fetch(`${CONFIG.lcd}/cosmos/staking/v1beta1/delegations/${address}`);
-    const delData = await delRes.json();
+    // 并行请求：委托数据（实时）+ 验证人列表（缓存 60 秒）
+    const [delData, valData] = await Promise.all([
+      fetchAPI(`/cosmos/staking/v1beta1/delegations/${address}`),
+      fetchAPIWithCache(
+        '/cosmos/staking/v1beta1/validators?pagination.limit=200',
+        'paxi_validators_cache',
+        60000
+      ),
+    ]);
     const delegations = delData.delegation_responses || [];
     if (delegations.length === 0) {
       document.getElementById('rdFrom').innerHTML = `<option value="">${t('redelegate.noDelegations')}</option>`;
       return;
     }
-    const valRes = await fetch(`${CONFIG.lcd}/cosmos/staking/v1beta1/validators?pagination.limit=100`);
-    const valData = await valRes.json();
     const validators = valData.validators || [];
     const valMap = {};
     validators.forEach(v => { valMap[v.operator_address] = v; });

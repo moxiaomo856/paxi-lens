@@ -55,7 +55,6 @@ function switchNetwork(network) {
   window.location.reload();
 }
 
-// 全局配置（基于当前网络动态计算）
 const SHARED_CONFIG = {
   get denom() { return getDenom(); },
   get denomDisplay() { return getNetworkConfig().denomDisplay; },
@@ -66,6 +65,13 @@ const SHARED_CONFIG = {
   maxMessagesPerTx: 100,
   feeCollector: 'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd',
   feeRate: 1.5,
+  // 批量转账按地址收费（PAXI/地址）
+  batchTransfer: {
+    feePerAddress: 0.03838,     // 原生/PRC-20 每地址手续费
+    nftFeePerAddress: 1,        // NFT 每地址手续费
+    maxAddressesPerTx: 100,     // 每笔交易最多地址数
+    maxTotalAddresses: 1000,    // 总上限
+  },
   // NFT 市场配置
   nftMarket: {
     listingFee: 2,
@@ -76,8 +82,8 @@ const SHARED_CONFIG = {
   },
   // 治理提案配置
   governance: {
-    submitFee: 50,          // 工具手续费（PAXI），以后要调就改这里
-    defaultDeposit: 100,    // 默认押金（PAXI）
+    submitFee: 50,
+    defaultDeposit: 100,
   },
 };
 
@@ -289,6 +295,28 @@ function mapError(code, rawLog) {
 // ============================================================
 // LCD 请求辅助
 // ============================================================
+// 带缓存的 LCD 请求（用于不常变化的数据，如验证人列表）
+// cacheKey: localStorage 键名，cacheTtl: 缓存有效期（毫秒）
+async function fetchAPIWithCache(path, cacheKey, cacheTtl = 60000) {
+  // 尝试读缓存
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { data, ts } = JSON.parse(cached);
+      if (Date.now() - ts < cacheTtl) {
+        return data;
+      }
+    }
+  } catch (e) {}
+  // 缓存未命中或过期，请求 LCD
+  const data = await fetchAPI(path);
+  // 写入缓存
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify({ data, ts: Date.now() }));
+  } catch (e) {}
+  return data;
+}
+
 async function fetchAPI(path) {
   const res = await fetch(`${getLCD()}${path}`);
   if (!res.ok) throw new Error(`API 请求失败: HTTP ${res.status}`);

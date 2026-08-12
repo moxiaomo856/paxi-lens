@@ -157,20 +157,6 @@ let _nftStep = 1;
 let _nftCoverBase64 = null;
 let _nftDeployed = JSON.parse(localStorage.getItem('paxi_nft_deployed') || '[]');
 
-// ========== 辅助函数：十六进制转 bech32 ==========
-function _hexToBech32(hex, prefix) {
-  try {
-    const bytes = [];
-    for (let i = 0; i < hex.length; i += 2) {
-      bytes.push(parseInt(hex.substr(i, 2), 16));
-    }
-    return bech32Encode(prefix, bytes);
-  } catch (e) {
-    console.warn('hexToBech32 failed:', e);
-    return hex; // 返回原始值，避免中断流程
-  }
-}
-
 // ========== RENDER ==========
 function renderNftLauncher() {
   const walletAddr = (state && state.wallet) ? state.wallet.address : '';
@@ -511,14 +497,7 @@ async function _deployNft() {
     for (const ev of evs) {
       if (ev.type === 'instantiate') {
         for (const attr of ev.attributes || []) {
-          if (attr.key === '_contract_address') {
-            contractAddr = attr.value;
-            // 如果是十六进制格式，转换为 bech32
-            if (contractAddr && /^[0-9A-Fa-f]+$/.test(contractAddr) && contractAddr.length > 30) {
-              contractAddr = _hexToBech32(contractAddr, 'paxi');
-            }
-            break;
-          }
+          if (attr.key === '_contract_address') { contractAddr = attr.value; break; }
         }
       }
       if (contractAddr) break;
@@ -565,12 +544,7 @@ async function _deployNft() {
 // ========== BATCH MINT ==========
 async function _mintNft() {
   if (!state || !state.connected) { showToast(_nftL('needWallet'), 'error'); return; }
-  let contractAddr = document.getElementById('mintContractAddr').value.trim();
-  // 转换十六进制地址为 bech32 格式
-  if (contractAddr && /^[0-9A-Fa-f]+$/.test(contractAddr) && contractAddr.length > 30) {
-    contractAddr = _hexToBech32(contractAddr, 'paxi');
-    document.getElementById('mintContractAddr').value = contractAddr;
-  }
+  const contractAddr = document.getElementById('mintContractAddr').value.trim();
   const count = parseInt(document.getElementById('mintCount').value) || 0;
   if (!contractAddr || count < 1) { showToast(_nftL('fillAll'), 'warning'); return; }
   if (count > 10) { showToast(_nftL('max10Hint'), 'warning'); return; }
@@ -667,12 +641,7 @@ function _calcMintFee() {
 // ========== METADATA ==========
 function _genMetadata() {
   const l = _nftL;
-  let contractAddr = document.getElementById('metaContractAddr').value.trim();
-  // 转换十六进制地址为 bech32 格式
-  if (contractAddr && /^[0-9A-Fa-f]+$/.test(contractAddr) && contractAddr.length > 30) {
-    contractAddr = _hexToBech32(contractAddr, 'paxi');
-    document.getElementById('metaContractAddr').value = contractAddr;
-  }
+  const contractAddr = document.getElementById('metaContractAddr').value.trim();
   const tokenId = document.getElementById('metaTokenId').value.trim();
   if (!contractAddr || !tokenId) { showToast(l('fillAll'), 'warning'); return; }
 
