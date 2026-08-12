@@ -10,16 +10,19 @@ function renderRedelegate() {
         <span style="font-size:11px;color:var(--text-muted);">📊 手续费：&lt;50,000 PAXI 按 0.2%，≥50,000 PAXI 按 0.18%</span>
       </div>
       <div class="form-group">
-        <label class="form-label">${t('redelegate.from')}</label>
-        <select id="rdFrom" onchange="updateRdPreview()">
-          <option value="">${t('redelegate.selectFrom')}</option>
+        <label class="form-label">${t('redelegate.from')} <span id="rdFromLoading" style="font-size:11px;color:var(--primary);">⏳ 加载中...</span></label>
+        <select id="rdFrom" onchange="updateRdPreview()" ${!state.connected ? 'disabled' : ''}>
+          <option value="">${state.connected ? '⏳ 加载中...' : t('redelegate.selectFrom')}</option>
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">${t('redelegate.to')}</label>
-        <select id="rdTo" onchange="updateRdPreview()">
-          <option value="">${t('redelegate.selectTo')}</option>
+        <label class="form-label">${t('redelegate.to')} <span id="rdToLoading" style="font-size:11px;color:var(--primary);">⏳ 加载中...</span></label>
+        <select id="rdTo" onchange="updateRdPreview()" ${!state.connected ? 'disabled' : ''}>
+          <option value="">${state.connected ? '⏳ 加载中...' : t('redelegate.selectTo')}</option>
         </select>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button class="btn btn-outline btn-xs" id="rdRetryValidators" onclick="loadValidatorsOnly()" style="display:none;font-size:11px;padding:4px 8px;min-height:28px;">🔄 重试验证人列表</button>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">${t('redelegate.amount')}</label>
@@ -49,48 +52,176 @@ function renderRedelegate() {
   `;
 }
 
+async function withTimeout(promise, ms, name) {
+  let timer;
+  const timeout = new Promise((_, rej) => {
+    timer = setTimeout(() => rej(new Error(`${name || '请求'}超时（${(ms/1000).toFixed(0)}秒），可点击重试按钮`)), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function loadRedelegateData() {
   if (!state.connected) {
     showToast(t('common.connectFirst'), 'error');
     return;
   }
+  const address = state.wallet.address;
+  const fromSel = document.getElementById('rdFrom');
+  const toSel = document.getElementById('rdTo');
+  const fromLoading = document.getElementById('rdFromLoading');
+  const toLoading = document.getElementById('rdToLoading');
+  const retryBtn = document.getElementById('rdRetryValidators');
+  if (!fromSel) return;
+
+  // ====== 立刻填充本地乐观缓存（如果有），0ms 响应 ======
   try {
-    const address = state.wallet.address;
-    // 并行请求：委托数据（实时）+ 验证人列表（缓存 60 秒）
-    const [delData, valData] = await Promise.all([
+    const cachedDel = localStorage.getItem('paxi_my_delegations_cache');
+    const cachedVal = localStorage.getItem('paxi_validators_cache');
+    if (cachedDel) {
+      try {
+        const { data } = JSON.parse(cachedDel);
+        const delegations = (data?.delegation_responses || []);
+        if (delegations.length > 0) {
+          populateFromSelect(delegations, null, ' (本地缓存)');
+          if (fromLoading) fromLoading.textContent = '✅ 缓存已载入，刷新中...';
+        }
+      } catch (_) {}
+    }
+    if (cachedVal) {
+      try {
+        const { data } = JSON.parse(cachedVal);
+        const validators = (data?.validators || []);
+        if (validators.length > 0) {
+          populateToSelect(validators);
+          if (toLoading) toLoading.textContent = '✅ 缓存已载入，刷新中...';
+        }
+      } catch (_) {}
+    }
+  } catch (e) {}
+
+  // ====== 独立加载：委托 / 验证人 互不阻塞 ======
+  // 1) 先加载委托（快，用户必须先选 from）
+  loadDelegationsOnly(address);
+  // 2) 再加载验证人（慢，不阻塞 from 的使用）
+  loadValidatorsOnly();
+}
+
+async function loadDelegationsOnly(address) {
+  if (!address && state.wallet) address = state.wallet.address;
+  if (!address) return;
+  const fromSel = document.getElementById('rdFrom');
+  const fromLoading = document.getElementById('rdFromLoading');
+  try {
+    const cacheKey = 'paxi_my_delegations_cache';
+    const delData = await withTimeout(
       fetchAPI(`/cosmos/staking/v1beta1/delegations/${address}`),
+      8000,
+      '查询您的委托'
+    );
+    const delegations = delData.delegation_responses || [];
+    // 写入缓存（30秒 TTL）
+    try { localStorage.setItem(cacheKey, JSON.stringify({ data: delData, ts: Date.now() })); } catch (_) {}
+
+    // 并行读取验证人缓存（需要显示 moniker）
+    let valMap = {};
+    try {
+      const cachedVal = localStorage.getItem('paxi_validators_cache');
+      if (cachedVal) {
+        const validators = (JSON.parse(cachedVal).data?.validators || []);
+        validators.forEach(v => { valMap[v.operator_address] = v; });
+      }
+    } catch (_) {}
+
+    populateFromSelect(delegations, valMap, '');
+    if (fromLoading) fromLoading.textContent = '';
+  } catch (e) {
+    console.error('[Redelegate] 委托加载失败:', e);
+    if (fromSel && fromSel.options.length <= 1 && fromSel.options[0]?.textContent?.includes('加载中')) {
+      fromSel.innerHTML = `<option value="">❌ 加载失败：${e.message}，请重试</option>`;
+    }
+    if (fromLoading) fromLoading.innerHTML = `<span style="color:var(--danger);">❌ ${e.message}</span>`;
+  }
+}
+
+async function loadValidatorsOnly() {
+  const toSel = document.getElementById('rdTo');
+  const toLoading = document.getElementById('rdToLoading');
+  const retryBtn = document.getElementById('rdRetryValidators');
+  try {
+    if (retryBtn) retryBtn.style.display = 'none';
+    const valData = await withTimeout(
       fetchAPIWithCache(
-        '/cosmos/staking/v1beta1/validators?pagination.limit=200',
+        '/cosmos/staking/v1beta1/validators?pagination.limit=100&status=BOND_STATUS_BONDED',
         'paxi_validators_cache',
         60000
       ),
-    ]);
-    const delegations = delData.delegation_responses || [];
-    if (delegations.length === 0) {
-      document.getElementById('rdFrom').innerHTML = `<option value="">${t('redelegate.noDelegations')}</option>`;
-      return;
-    }
+      10000,
+      '加载验证人列表'
+    );
     const validators = valData.validators || [];
+    populateToSelect(validators);
+    // 验证人回来后，重新 populate from（补全 moniker，之前可能只有缓存的）
     const valMap = {};
     validators.forEach(v => { valMap[v.operator_address] = v; });
-
-    const fromSelect = document.getElementById('rdFrom');
-    const toSelect = document.getElementById('rdTo');
-    fromSelect.innerHTML = `<option value="">${t('redelegate.selectFrom')}</option>`;
-    toSelect.innerHTML = `<option value="">${t('redelegate.selectTo')}</option>`;
-
-    for (const d of delegations) {
-      const val = valMap[d.delegation.validator_address];
-      const label = val ? `${val.description?.moniker || 'Unknown'} (${(parseInt(d.balance.amount)/1e6).toFixed(2)} PAXI)` : d.delegation.validator_address.slice(0,12);
-      fromSelect.innerHTML += `<option value="${d.delegation.validator_address}" data-amount="${parseInt(d.balance.amount)/1e6}">${label}</option>`;
-    }
-    for (const v of validators) {
-      const commission = parseFloat(v.commission?.commission_rates?.rate || 0) * 100;
-      toSelect.innerHTML += `<option value="${v.operator_address}">${v.description?.moniker || 'Unknown'} (${commission.toFixed(1)}%)</option>`;
-    }
+    try {
+      const cachedDel = localStorage.getItem('paxi_my_delegations_cache');
+      if (cachedDel) {
+        const delegations = (JSON.parse(cachedDel).data?.delegation_responses || []);
+        if (delegations.length > 0) {
+          const currentFrom = document.getElementById('rdFrom')?.value;
+          populateFromSelect(delegations, valMap, '');
+          if (currentFrom) document.getElementById('rdFrom').value = currentFrom;
+        }
+      }
+    } catch (_) {}
+    if (toLoading) toLoading.textContent = '';
   } catch (e) {
-    console.error('加载质押数据失败:', e);
-    showToast(e.message, 'error');
+    console.error('[Redelegate] 验证人列表失败:', e);
+    if (toSel && toSel.options.length <= 1 && toSel.options[0]?.textContent?.includes('加载中')) {
+      toSel.innerHTML = `<option value="">❌ 加载失败：${e.message}</option>`;
+    }
+    if (toLoading) toLoading.innerHTML = `<span style="color:var(--danger);">❌ ${e.message}</span>`;
+    if (retryBtn) retryBtn.style.display = 'inline-flex';
+  }
+}
+
+function populateFromSelect(delegations, valMap, suffix) {
+  const fromSel = document.getElementById('rdFrom');
+  if (!fromSel) return;
+  if (delegations.length === 0) {
+    fromSel.innerHTML = `<option value="">${t('redelegate.noDelegations')}</option>`;
+    return;
+  }
+  fromSel.innerHTML = `<option value="">${t('redelegate.selectFrom')}${suffix}</option>`;
+  for (const d of delegations) {
+    const val = valMap ? valMap[d.delegation.validator_address] : null;
+    const amountPaxi = (parseInt(d.balance.amount) / 1e6).toFixed(2);
+    const label = val
+      ? `${val.description?.moniker || val.operator_address?.slice(0, 12)} (${amountPaxi} PAXI)`
+      : `${d.delegation.validator_address.slice(0, 14)}... (${amountPaxi} PAXI)`;
+    fromSel.innerHTML += `<option value="${d.delegation.validator_address}" data-amount="${(parseInt(d.balance.amount)/1e6).toFixed(6)}">${label}</option>`;
+  }
+}
+
+function populateToSelect(validators) {
+  const toSel = document.getElementById('rdTo');
+  if (!toSel) return;
+  toSel.innerHTML = `<option value="">${t('redelegate.selectTo')}</option>`;
+  // 按质押量降序（活跃节点排前面）+ 佣金过滤掉过高的
+  const sorted = [...validators].sort((a, b) => {
+    const aTok = parseInt(a.tokens || 0);
+    const bTok = parseInt(b.tokens || 0);
+    return bTok - aTok;
+  });
+  for (const v of sorted) {
+    const commission = parseFloat(v.commission?.commission_rates?.rate || 0) * 100;
+    const moniker = v.description?.moniker || v.operator_address.slice(0, 12);
+    const tokens = (parseInt(v.tokens || 0) / 1e6).toFixed(0);
+    toSel.innerHTML += `<option value="${v.operator_address}">${moniker} · ${commission.toFixed(1)}% · ${tokens.toLocaleString()} PAXI 质押</option>`;
   }
 }
 
