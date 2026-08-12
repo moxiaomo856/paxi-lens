@@ -7,6 +7,9 @@ function renderBatchTransfer() {
       <div class="info-box">
         <strong>⚡ ${t('batchTransfer.modePack')}</strong><br>
         <span style="font-size:11px;color:var(--text-muted);">${t('batchTransfer.note')}</span>
+        <div style="margin-top:8px;padding:8px 10px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:6px;font-size:12px;color:var(--primary);line-height:1.6;">
+          📌 <strong>地址上限说明：</strong>每次最多支持 <strong>1000</strong> 个地址，系统会自动按每 <strong>100</strong> 个地址分批上链。如超过 1000 个地址，请分多次操作。
+        </div>
       </div>
       <div class="tool-desc">${t('batchTransfer.desc')}</div>
       <div class="tabs">
