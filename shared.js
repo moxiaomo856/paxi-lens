@@ -82,7 +82,7 @@ const SHARED_CONFIG = {
   },
   // 治理提案配置
   governance: {
-    submitFee: 50,
+    submitFee: 0,
     defaultDeposit: 100,
   },
 };
@@ -324,6 +324,154 @@ async function fetchAPI(path) {
 }
 
 // ============================================================
+// IPFS / Pinata 上传辅助（NFT 铸造时集成）
+// 用户自行填入 Pinata JWT，存于 localStorage，前端硬编码有滥用风险故不内置
+// ============================================================
+const IPFS_GATEWAY = 'https://gateway.pinata.cloud/ipfs/';
+const PINATA_PIN_API = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
+
+function getPinataJwt() {
+  return localStorage.getItem('paxi_pinata_jwt') || '';
+}
+function setPinataJwt(jwt) {
+  const v = (jwt || '').trim();
+  if (v) localStorage.setItem('paxi_pinata_jwt', v);
+  else localStorage.removeItem('paxi_pinata_jwt');
+}
+function hasPinataJwt() {
+  return !!getPinataJwt();
+}
+
+// 从 ipfs://Qm... 或 https://gateway/ipfs/Qm... 中提取 CID
+function ipfsCidFromUri(uri) {
+  if (!uri) return '';
+  let s = String(uri).trim();
+  if (s.startsWith('ipfs://')) return s.slice(7).replace(/\/.*$/, '');
+  const m = s.match(/\/ipfs\/(Qm[1-9A-HJ-NP-Za-km-z]{44}|baf[a-z0-9]{44,})/);
+  return m ? m[1] : '';
+}
+
+// 将 ipfs:// URI 或裸 CID 转为可访问的 https 网关地址；http(s)/data 原样返回
+function ipfsToHttp(uri) {
+  if (!uri) return '';
+  const s = String(uri).trim();
+  if (s.startsWith('ipfs://')) {
+    const cid = s.slice(7).replace(/\/.*$/, '');
+    return cid ? IPFS_GATEWAY + cid : '';
+  }
+  // 裸 CID（Qm... 或 baf...）
+  if (/^(Qm[1-9A-HJ-NP-Za-km-z]{44}|baf[a-z0-9]{44,})$/.test(s)) {
+    return IPFS_GATEWAY + s;
+  }
+  // 已是 http(s)/data，直接返回
+  if (/^(https?:\/\/|data:)/i.test(s)) return s;
+  return '';
+}
+
+// 上传文件到 Pinata（XHR 以支持上传进度），返回 { cid, url, size }
+function uploadFileToIpfs(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const jwt = getPinataJwt();
+    if (!jwt) { reject(new Error('未配置 Pinata JWT')); return; }
+    const fd = new FormData();
+    fd.append('file', file);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', PINATA_PIN_API);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + jwt);
+    if (typeof onProgress === 'function') {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
+      };
+    }
+    xhr.timeout = 120000;
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300 && data.IpfsHash) {
+          resolve({ cid: data.IpfsHash, url: IPFS_GATEWAY + data.IpfsHash, size: data.PinSize });
+        } else {
+          reject(new Error(data.error || data.message || ('HTTP ' + xhr.status)));
+        }
+      } catch (e) {
+        reject(new Error('IPFS 响应解析失败: ' + (xhr.responseText || '').slice(0, 120)));
+      }
+    };
+    xhr.onerror = () => reject(new Error('网络错误，IPFS 上传失败'));
+    xhr.ontimeout = () => reject(new Error('IPFS 上传超时'));
+    xhr.send(fd);
+  });
+}
+
+// 上传 JSON 对象到 Pinata（作为 metadata.json），返回 { cid, url }
+async function uploadJsonToIpfs(jsonObj, filename) {
+  const jwt = getPinataJwt();
+  if (!jwt) throw new Error('未配置 Pinata JWT');
+  const blob = new Blob([JSON.stringify(jsonObj)], { type: 'application/json' });
+  const fd = new FormData();
+  fd.append('file', blob, filename || 'metadata.json');
+  const res = await fetch(PINATA_PIN_API, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + jwt },
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.IpfsHash) throw new Error(data.error || data.message || ('HTTP ' + res.status));
+  return { cid: data.IpfsHash, url: IPFS_GATEWAY + data.IpfsHash };
+}
+
+// 构造符合 CW721 标准的元数据对象
+function buildCw721Metadata(name, description, imageUri, attributes) {
+  return {
+    name: name || 'Untitled NFT',
+    description: description || '',
+    image: imageUri || '',
+    external_url: '',
+    attributes: Array.isArray(attributes) ? attributes : [],
+  };
+}
+
+// 解析 token_uri 获取元数据 JSON（支持 ipfs/https/data，带超时）
+async function fetchTokenUriMetadata(tokenUri, timeoutMs) {
+  const http = ipfsToHttp(tokenUri);
+  if (!http) return null;
+  // data:application/json;base64,... 直接解码
+  if (http.startsWith('data:application/json')) {
+    const b64 = http.split(',')[1] || '';
+    try {
+      const json = atob(b64);
+      // 处理 UTF-8
+      return JSON.parse(decodeURIComponent(escape(json)));
+    } catch (e) { return null; }
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 5000);
+  try {
+    const res = await fetch(http, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    clearTimeout(timer);
+    return null;
+  }
+}
+
+// 将任意图片 URI 解析为可安全用于 <img src> 的地址（转义后返回，不可用则返回空串）
+function safeNftImgSrc(uri) {
+  if (!uri) return '';
+  const http = ipfsToHttp(uri);
+  if (!http) return '';
+  // 仅允许 http/https/data:image，并转义
+  return sanitizeUrl(http);
+}
+
+// UTF-8 安全的 JSON -> base64 data URI（IPFS 关闭时的降级方案）
+function jsonToDataUri(jsonObj) {
+  const bytes = new TextEncoder().encode(JSON.stringify(jsonObj));
+  return 'data:application/json;base64,' + toBase64(bytes);
+}
+
+// ============================================================
 // 交易构建 & 签名 & 广播（通用函数）
 // wallet: { address, public_key, algo } 或 { address, publicKey, connected }
 // ============================================================
@@ -429,6 +577,7 @@ async function buildSignAndBroadcast(messages, memo, gasLimit, wallet) {
       else if (msg.typeUrl?.includes('MsgDeposit')) gasSum += 200000;
       else if (msg.typeUrl?.includes('MsgVote')) gasSum += 100000;
       else if (msg.typeUrl?.includes('MsgBeginRedelegate')) gasSum += 200000;
+      else if (msg.typeUrl?.includes('MsgCancelProposal')) gasSum += 150000;
       else gasSum += 200000;
     }
     totalGas = gasSum + 100000;

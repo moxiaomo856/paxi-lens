@@ -15,6 +15,7 @@ const LANG = {
       nftMarket: 'NFT市场',
       txTracker: '交易追踪',
       nftLauncher: 'NFT发射',
+      myNfts: '我的NFT',
       addressConvert: '地址转换',
       redelegate: '变更质押节点',
       gasCalc: 'gas计算',
@@ -22,6 +23,7 @@ const LANG = {
       p2pMarket: '买卖发布',
       proposal: '治理提案',
       games: '游戏娱乐',
+      monitor: '链上监测',
       later: '后期开发……'
     },
     batchTransfer: {
@@ -184,6 +186,13 @@ const LANG = {
       emptyFields: '请填写提案标题和描述',
       invalidDeposit: '押金必须大于 0',
       confirmSubmit: '确认支付 {fee} PAXI 手续费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。',
+      cancel: '撤销',
+      cancelBtn: '🗑 撤销提案',
+      cancelConfirm: '确认撤销提案 #{id}？撤销后押金将退还给您。',
+      canceling: '撤销中...',
+      cancelSuccess: '✅ 提案 #{id} 已撤销，押金将退还。',
+      cancelFail: '❌ 撤销提案失败：',
+      onlyDepositCanCancel: '仅押金中的提案可撤销',
     },
     disclaimer: {
       siteWide: '⚠️ 本网站（及所有子页面）仅供链上数据查询和钱包操作辅助使用。不提供任何代币兑换、交易撮合、定价指引或信息中介服务。用户的一切链上操作均为自主行为，与本网站无关。请遵守您所在国家或地区的法律法规。',
@@ -197,6 +206,34 @@ const LANG = {
       batchTransfer: '⚠️ 本功能仅用于个人钱包资产管理，不得用于商业支付、代币兑换或任何形式的虚拟货币交易服务。用户的一切转账行为均为自主操作，与本工具无关。',
       redelegate: '本操作仅用于自主管理质押节点，属于链上治理行为，不构成投资建议。',
       nftLauncher: '本工具仅提供 NFT 铸造的技术服务，不提供任何交易撮合、定价或兑换功能。用户自行承担持有和处置 NFT 的一切后果。'
+    },
+    myNfts: {
+      title: '🖼️ 我的 NFT',
+      desc: '输入钱包地址，查看持有的 NFT（显示图片、名称、属性等完整信息）。',
+      walletAddr: '钱包地址',
+      contract: 'NFT 合约地址',
+      selectContract: '-- 选择已部署合约 --',
+      manualInput: '手动输入合约地址',
+      query: '🔍 查询',
+      querying: '正在查询链上数据...',
+      loadingMeta: '正在加载元数据',
+      noNft: '该地址暂无 NFT',
+      noContract: '请选择或输入合约地址',
+      loadMore: '加载更多',
+      exportCsv: '📥 导出 CSV',
+      tokenId: 'Token ID',
+      name: '名称',
+      attributes: '属性',
+      image: '图片',
+      contractAddr: '合约地址',
+      tokenUri: 'Token URI',
+      description: '描述',
+      total: '共',
+      nftUnit: '个 NFT',
+      queryFail: '查询失败',
+      cached: '（来自缓存）',
+      exported: '已导出 CSV',
+      disclaimer: '本工具仅查询链上 NFT 数据，不涉及交易服务。'
     },
     games: {
       title: '🎮 游戏娱乐',
@@ -304,6 +341,7 @@ const LANG = {
       nftMarket: 'NFT Market',
       txTracker: 'Tx Tracker',
       nftLauncher: 'NFT Launcher',
+      myNfts: 'My NFTs',
       addressConvert: 'Address Convert',
       redelegate: 'Redelegate',
       gasCalc: 'Gas Calc',
@@ -311,6 +349,7 @@ const LANG = {
       p2pMarket: 'P2P Market',
       proposal: 'Gov Proposal',
       games: 'Game Center',
+      monitor: 'Chain Monitor',
       later: 'Coming Soon…'
     },
     batchTransfer: {
@@ -473,6 +512,13 @@ const LANG = {
       emptyFields: 'Please fill in title and description',
       invalidDeposit: 'Deposit must be greater than 0',
       confirmSubmit: 'Confirm to pay {fee} PAXI platform fee + {deposit} PAXI deposit? Deposit will be refunded if proposal passes.',
+      cancel: 'Cancel',
+      cancelBtn: '🗑 Cancel Proposal',
+      cancelConfirm: 'Cancel proposal #{id}? Deposit will be refunded.',
+      canceling: 'Canceling...',
+      cancelSuccess: '✅ Proposal #{id} cancelled. Deposit will be refunded.',
+      cancelFail: '❌ Cancel failed: ',
+      onlyDepositCanCancel: 'Only proposals in deposit period can be cancelled',
     },
     disclaimer: {
       siteWide: '⚠️ This website (and all subpages) is for on-chain data query and wallet operation assistance only. It does not provide any token exchange, transaction matching, pricing guidance, or information intermediary services. All user on-chain operations are independent actions and unrelated to this website. Please comply with the laws and regulations of your country or region.',
@@ -486,6 +532,34 @@ const LANG = {
       batchTransfer: '⚠️ This function is only for personal wallet asset management and must not be used for commercial payments, token exchange, or any form of virtual currency trading services. All user transfer actions are independent operations and unrelated to this tool.',
       redelegate: 'This operation is only for independent management of staking nodes and is an on-chain governance action, not investment advice.',
       nftLauncher: 'This tool only provides technical services for NFT minting and does not provide any transaction matching, pricing, or exchange functions. Users bear all consequences of holding and disposing of NFTs.'
+    },
+    myNfts: {
+      title: '🖼️ My NFTs',
+      desc: 'Enter a wallet address to view NFTs (image, name, attributes).',
+      walletAddr: 'Wallet Address',
+      contract: 'NFT Contract',
+      selectContract: '-- Select deployed contract --',
+      manualInput: 'Manual input address',
+      query: '🔍 Query',
+      querying: 'Querying on-chain data...',
+      loadingMeta: 'Loading metadata',
+      noNft: 'No NFTs found for this address',
+      noContract: 'Please select or enter a contract address',
+      loadMore: 'Load More',
+      exportCsv: '📥 Export CSV',
+      tokenId: 'Token ID',
+      name: 'Name',
+      attributes: 'Attributes',
+      image: 'Image',
+      contractAddr: 'Contract Address',
+      tokenUri: 'Token URI',
+      description: 'Description',
+      total: 'Total',
+      nftUnit: 'NFTs',
+      queryFail: 'Query failed',
+      cached: '(cached)',
+      exported: 'CSV exported',
+      disclaimer: 'This tool only queries on-chain NFT data, no trading services.'
     },
     games: {
       title: '🎮 Game Center',
@@ -747,13 +821,15 @@ function renderHome() {
     // { id: 'nft-market', icon: '🏪', label: 'tools.nftMarket' }, // 合规移除：NFT市场
     { id: 'tx-tracker', icon: '🔍', label: 'tools.txTracker' },
     { id: 'nft-launcher', icon: '🎨', label: 'tools.nftLauncher' },
+    { id: 'my-nfts', icon: '🖼️', label: 'tools.myNfts' },
     { id: 'address-convert', icon: '🔄', label: 'tools.addressConvert' },
     { id: 'redelegate', icon: '🔄', label: 'tools.redelegate' },
     { id: 'gas-calc', icon: '⛽', label: 'tools.gasCalc' },
     { id: 'validator-compare', icon: '🏦', label: 'tools.validatorCompare' },
     // { id: 'p2p-market', icon: '📊', label: 'tools.p2pMarket' }, // 合规移除：P2P买卖市场
     { id: 'proposal', icon: '📦', label: 'tools.proposal' },
-    { id: 'games', icon: '🎮', label: 'tools.games' },
+    // { id: 'games', icon: '🎮', label: 'tools.games' }, // 已注释：游戏娱乐
+    // { id: 'monitor', icon: '📡', label: 'tools.monitor' }, // 已注释：链上监测
     { id: 'later', icon: '📌', label: 'tools.later' },
   ];
 
@@ -773,6 +849,9 @@ function renderHome() {
       const toolId = card.dataset.tool;
       if (toolId === 'later') {
         showToast(t('tools.later'), 'info');
+      // } else if (toolId === 'monitor') {
+      //   // 链上监测：跳转到独立页面
+      //   window.location.href = 'monitor/index.html';
       } else {
         navigateToTool(toolId);
       }

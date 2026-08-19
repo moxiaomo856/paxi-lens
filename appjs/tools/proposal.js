@@ -388,6 +388,257 @@ async function submitProposal() {
 }
 
 // ============ 提案列表 ============
+
+// 手动编码 MsgCancelProposal（PaxiCosmJS 未内置此类型）
+// protobuf: message MsgCancelProposal { uint64 proposal_id = 1; string proposer = 2; }
+function _encodeMsgCancelProposal(proposalId, proposer) {
+  const bytes = [];
+  // ---- Field 1: proposal_id (uint64, varint), tag = (1<<3)|0 = 0x08 ----
+  bytes.push(0x08);
+  let pidNum = Number(proposalId);
+  if (!(pidNum >= 0)) pidNum = 0;
+  if (pidNum === 0) {
+    bytes.push(0);
+  } else {
+    // 用 Number 做 varint，避免 BigInt 在部分老浏览器的位运算兼容问题
+    // proposal_id 不会超过 2^53，Number 安全
+    let v = pidNum >>> 0;
+    let hi = Math.floor(pidNum / 0x100000000); // 高 21 位
+    while (v >= 0x80 || hi > 0) {
+      bytes.push((v & 0x7f) | 0x80);
+      v = ((v >>> 7) | (hi & 0x7f) << 25) >>> 0;
+      hi >>>= 7;
+    }
+    bytes.push(v & 0x7f);
+  }
+  // ---- Field 2: proposer (string, length-delimited), tag = (2<<3)|2 = 0x12 ----
+  const proposerBytes = new TextEncoder().encode(proposer);
+  bytes.push(0x12);
+  let len = proposerBytes.length >>> 0;
+  while (len >= 0x80) {
+    bytes.push((len & 0x7f) | 0x80);
+    len >>>= 7;
+  }
+  bytes.push(len & 0x7f);
+  for (let i = 0; i < proposerBytes.length; i++) bytes.push(proposerBytes[i]);
+  return new Uint8Array(bytes);
+}
+
+// 全局存储提案状态和 proposer，供 fetchProposer 使用
+const _proposalStatusMap = {};
+const _proposalProposerMap = {};
+
+// 探测 MsgCancelProposal 在链上可用的 typeUrl
+// 策略：优先 v1beta1（与 MsgSubmitProposal 一致），失败则尝试 v1
+let _cachedCancelTypeUrl = null;
+async function _probeCancelTypeUrl(proposer, msgBytes) {
+  if (_cachedCancelTypeUrl) return _cachedCancelTypeUrl;
+  const candidates = [
+    '/cosmos.gov.v1beta1.MsgCancelProposal',
+    '/cosmos.gov.v1.MsgCancelProposal',
+  ];
+  const lcd = typeof CONFIG !== 'undefined' ? CONFIG.lcd : getLCD();
+  for (const typeUrl of candidates) {
+    try {
+      const msgAny = PaxiCosmJS.Any.fromPartial({ typeUrl, value: msgBytes });
+      const txBody = PaxiCosmJS.TxBody.fromPartial({
+        messages: [msgAny],
+        memo: `Cancel Proposal probe`,
+      });
+      const bodyBytes = PaxiCosmJS.TxBody.encode(txBody).finish();
+      // 构造一个空的签名者 (模拟不需要真实签名，gas 会被返回就行)
+      const authInfo = PaxiCosmJS.AuthInfo.fromPartial({
+        signerInfos: [],
+        fee: PaxiCosmJS.Fee.fromPartial({
+          amount: [PaxiCosmJS.Coin.fromPartial({ denom: CONFIG.denom, amount: '0' })],
+          gasLimit: 0,
+        }),
+      });
+      const authBytes = PaxiCosmJS.AuthInfo.encode(authInfo).finish();
+      const txRaw = PaxiCosmJS.TxRaw.fromPartial({
+        bodyBytes, authInfoBytes: authBytes, signatures: [new Uint8Array()],
+      });
+      const txBytesB64 = btoa(String.fromCharCode.apply(null, PaxiCosmJS.TxRaw.encode(txRaw).finish()));
+      const res = await fetch(`${lcd}/cosmos/tx/v1beta1/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tx_bytes: txBytesB64 }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const gas = data?.gas_info?.gas_used || data?.gasUsed;
+        // 如果返回有效 gas，说明 typeUrl 被识别（即便可能因为签名缺失报其他错，消息类型是好的）
+        if (gas && Number(gas) > 0) {
+          _cachedCancelTypeUrl = typeUrl;
+          return typeUrl;
+        }
+        // 如果没有 gas，但错误不是 "unknown" 也不是 "not found"，也可能是能识别的
+        const err = data?.error || '';
+        if (err && !/unknown|unrecognized|not found|route/i.test(err)) {
+          _cachedCancelTypeUrl = typeUrl;
+          return typeUrl;
+        }
+      } else {
+        const text = await res.text();
+        // 500/400 里如果是 decode 错误而不是 unknown，也说明消息类型被识别
+        if (!/unknown|unrecognized|not found|route/i.test(text)) {
+          _cachedCancelTypeUrl = typeUrl;
+          return typeUrl;
+        }
+      }
+    } catch (e) {
+      // 探测失败，跳过此候选
+      console.debug(`[probe] ${typeUrl} failed:`, e.message);
+    }
+  }
+  // 都探测不出来，就按与提交提案相同的 v1beta1 版本默认
+  _cachedCancelTypeUrl = '/cosmos.gov.v1beta1.MsgCancelProposal';
+  return _cachedCancelTypeUrl;
+}
+
+// 读取当前钱包余额（upaxi）
+async function _getBalance(addr) {
+  try {
+    const lcd = typeof CONFIG !== 'undefined' ? CONFIG.lcd : getLCD();
+    const denom = CONFIG.denom;
+    const res = await fetch(`${lcd}/cosmos/bank/v1beta1/balances/${addr}/by_denom?denom=${denom}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.balance?.amount || null;
+  } catch (e) { return null; }
+}
+
+async function cancelProposal(proposalId) {
+  if (typeof state !== 'undefined' && !state.connected) {
+    showToast(_t('proposal.connectFirst','请先连接钱包'), 'error');
+    return;
+  }
+  const confirmMsg = _t('proposal.cancelConfirm','确认撤销提案 #{id}？撤销后押金将退还给您。').replace('{id}', proposalId);
+  if (!confirm(confirmMsg)) return;
+
+  // 创建状态提示元素
+  let statusEl = document.getElementById('proposalStatus');
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.id = 'proposalStatus';
+    statusEl.className = 'status-msg';
+    const listEl = document.getElementById('proposalList');
+    if (listEl) listEl.parentNode.insertBefore(statusEl, listEl);
+  }
+  statusEl.style.display = 'block';
+  statusEl.className = 'status-msg info';
+  statusEl.textContent = _t('proposal.canceling','撤销中...') + ' (探测链上消息类型...)';
+
+  try {
+    const proposer = state.wallet.address;
+    const msgBytes = _encodeMsgCancelProposal(proposalId, proposer);
+    // 先探测链上支持的 typeUrl 版本
+    const cancelTypeUrl = await _probeCancelTypeUrl(proposer, msgBytes);
+
+    // 记录撤销前余额，用于之后验证押金退还
+    const balanceBefore = await _getBalance(proposer);
+
+    statusEl.textContent = _t('proposal.canceling','撤销中...') + ` (使用 ${cancelTypeUrl.includes('v1beta1') ? 'v1beta1' : 'v1'} API)`;
+
+    const messages = [PaxiCosmJS.Any.fromPartial({
+      typeUrl: cancelTypeUrl,
+      value: msgBytes,
+    })];
+
+    const summary = `Cancel Proposal #${proposalId}`;
+    const res = await buildSignAndBroadcast(messages, summary, null, state.wallet);
+
+    const txResp = res?.tx_response || res;
+    const txHash = txResp?.txhash;
+    const txCode = txResp?.code;
+    const txRawLog = txResp?.raw_log || res?.message || '';
+
+    if (txCode !== undefined && txCode !== 0) {
+      throw new Error(`交易失败 (code=${txCode}): ${txRawLog}`);
+    }
+
+    // 轮询确认
+    let txConfirmed = false;
+    let txErrorMessage = '';
+    let pollInfo = null;
+    if (typeof pollTxStatus === 'function' && txHash) {
+      try {
+        pollInfo = await pollTxStatus(txHash, 25);
+        if (pollInfo) {
+          if (pollInfo.confirmed && pollInfo.success) {
+            txConfirmed = true;
+          } else if (pollInfo.confirmed && !pollInfo.success) {
+            txErrorMessage = pollInfo.rawLog || `code=${pollInfo.code}`;
+          } else {
+            txErrorMessage = '超时未确认';
+          }
+        } else {
+          txErrorMessage = '超时未确认';
+        }
+      } catch (e) {
+        txErrorMessage = e.message || String(e);
+      }
+    }
+
+    if (!txConfirmed) {
+      const failMsg = _t('proposal.cancelFail','❌ 撤销提案失败：') + (txErrorMessage || '交易未上链确认');
+      statusEl.className = 'status-msg error';
+      statusEl.textContent = failMsg;
+      showToast(failMsg, 'error');
+      return;
+    }
+
+    // ===== 押金退还余额验证 =====
+    statusEl.className = 'status-msg info';
+    statusEl.textContent = _t('proposal.cancelSuccess','✅ 提案 #{id} 已撤销，押金将退还。').replace('{id}', proposalId) + ' 等待余额更新...';
+    let balanceAfter = null;
+    let refundPaxi = null;
+    let gasPaxi = null;
+    for (let retry = 0; retry < 6; retry++) {
+      await new Promise(r => setTimeout(r, 1500));
+      balanceAfter = await _getBalance(proposer);
+      if (balanceAfter && balanceBefore) {
+        const diff = BigInt(balanceAfter) - BigInt(balanceBefore);
+        // 理论上：押金退还 - 交易 gas 费 = 正或负
+        if (typeof upaxiToPaxi === 'function') {
+          refundPaxi = upaxiToPaxi(diff.toString());
+        } else {
+          refundPaxi = (Number(diff) / 1e6).toFixed(6);
+        }
+        // 估算 gas 费：交易记录里查或简单提示
+        gasPaxi = pollInfo && pollInfo.gasWanted ? (Number(pollInfo.gasWanted) * 0.25 / 1e6).toFixed(6) : null;
+        break;
+      }
+    }
+
+    let okHtml = `<strong>${_t('proposal.cancelSuccess','✅ 提案 #{id} 已撤销，押金将退还。').replace('{id}', proposalId)}</strong>`;
+    okHtml += `<br><span style="font-size:11px;">Tx: <code>${txHash ? txHash.slice(0,12)+'...' : '-'}</code></span>`;
+    if (refundPaxi != null && balanceBefore && balanceAfter) {
+      const sign = parseFloat(refundPaxi) >= 0 ? '+' : '';
+      const netBadge = parseFloat(refundPaxi) >= 0
+        ? `<span style="color:#52c41a;font-weight:700;">${sign}${refundPaxi} PAXI</span>`
+        : `<span style="color:var(--danger);font-weight:700;">${sign}${refundPaxi} PAXI</span>`;
+      okHtml += `<br><span style="font-size:12px;">钱包余额变化：${netBadge}`;
+      okHtml += `<br>&nbsp;&nbsp;✓ 押金已退还（退还金额 = 提案押金 - 撤销所需 gas 费）`;
+      if (gasPaxi) okHtml += `<br>&nbsp;&nbsp;💰 撤销 gas 费约：${gasPaxi} PAXI`;
+      okHtml += `</span>`;
+    } else {
+      okHtml += `<br><span style="font-size:12px;color:var(--text-muted);">押金已在链上退还，刷新首页余额可见。</span>`;
+    }
+    statusEl.className = 'status-msg success';
+    statusEl.innerHTML = okHtml;
+    showToast(_t('proposal.cancelSuccess','✅ 提案 #{id} 已撤销，押金将退还。').replace('{id}', proposalId), 'success');
+    setTimeout(loadProposalList, 3000);
+  } catch (e) {
+    console.error(e);
+    let msg = _t('proposal.cancelFail','❌ 撤销提案失败：') + (e.message || String(e));
+    if (typeof mapError === 'function') msg = _t('proposal.cancelFail','❌ 撤销提案失败：') + mapError(e);
+    statusEl.className = 'status-msg error';
+    statusEl.textContent = msg;
+    showToast(msg, 'error');
+  }
+}
+
 function statusLabel(status) {
   const s = GOV_STATUS[Number(status)] || { label: status, cls: 'warning' };
   let zhLabel = s.label;
@@ -408,6 +659,10 @@ function statusStrToNum(s) {
   return 0;
 }
 function normalizeProposal(p) {
+  // 提取 proposer：不同版本 API 字段位置不同
+  let proposer = p.proposer || null;
+  if (!proposer && p.proposal) proposer = p.proposal.proposer || null;
+  // v1beta1 有时把 proposer 放在 proposal 根对象里
   return {
     proposal_id: p.proposal_id || p.id,
     status: typeof p.status === 'number' ? p.status : statusStrToNum(p.status),
@@ -415,6 +670,9 @@ function normalizeProposal(p) {
     submit_time: p.submit_time || '',
     content: p.content || null,
     title: extractProposalTitle(p),
+    proposer: proposer,
+    // 保存原始数据，后续可继续挖掘
+    _raw: p,
   };
 }
 function extractProposalTitle(p) {
@@ -533,12 +791,15 @@ async function loadProposalList() {
     }
     proposals.sort((a, b) => Number(b.proposal_id || b.id || 0) - Number(a.proposal_id || a.id || 0));
 
-    // 先渲染列表（proposer 占位），再异步查询每个提案的发起人
+    // 先渲染列表：如果提案自带 proposer 就直接显示，否则显示查询中
     container.innerHTML = proposals.map(p => {
       const st = statusLabel(p.status);
       const time = p.submit_time || '';
       const deposit = formatDeposit(p.total_deposit || []);
       const pid = p.proposal_id || p.id || '?';
+      // 存储状态和 proposer 供后续使用
+      _proposalStatusMap[pid] = p.status;
+      if (p.proposer) _proposalProposerMap[pid] = p.proposer;
       const statusBadge = `<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;${
         st.cls === 'success' ? 'background:rgba(82,196,26,.15);color:#52c41a;' :
         st.cls === 'danger' ? 'background:rgba(255,77,79,.15);color:#ff4d4f;' :
@@ -546,6 +807,12 @@ async function loadProposalList() {
         'background:rgba(250,173,20,.15);color:#faad14;'
       }">${st.label}</span>`;
       const leftColor = st.cls==='success'?'#52c41a':st.cls==='danger'?'#ff4d4f':st.cls==='primary'?'var(--primary)':'#faad14';
+      // 如果列表数据里已经有 proposer，就直接显示不占位
+      const proposerHtml = p.proposer ? renderProposerHtml(pid, p.proposer) : `<span id="proposer-${pid}" style="font-family:var(--font-mono,monospace);">查询中...</span>`;
+      // 如果已有 proposer 且条件满足，直接渲染撤销按钮
+      const cancelBtnHtml = (p.proposer && shouldShowCancelBtn(pid, p.status, p.proposer))
+        ? renderCancelBtnHtml(pid)
+        : `<span id="cancel-btn-${pid}"></span>`;
       return `
         <div style="border-left:3px solid ${leftColor};background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -557,54 +824,103 @@ async function loadProposalList() {
             <span>💰 ${deposit}</span>
             <span>📅 ${formatTimeSafe(time)}</span>
           </div>
-          <div style="font-size:11px;color:var(--text-muted);">
-            <span>👤 </span><span id="proposer-${pid}" style="font-family:var(--font-mono,monospace);">查询中...</span>
+          <div style="font-size:11px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="display:flex;align-items:center;gap:2px;min-width:0;">👤 ${proposerHtml}</span>
+            ${cancelBtnHtml}
           </div>
         </div>
       `;
     }).join('');
 
-    // 异步查询每个提案的提议者地址
+    // 异步补充查询提案发起人（列表数据里没有的才查）
     for (const p of proposals) {
       const pid = p.proposal_id || p.id;
       if (!pid) continue;
-      fetchProposer(pid, lcd);
+      if (!p.proposer) {
+        fetchProposer(pid, lcd);
+      }
     }
   } catch (e) {
     container.innerHTML = `<p style="color:var(--danger);text-align:center;padding:10px;">加载失败：${escapeHtmlSafe(e.message)}</p>`;
   }
 }
 
+// 判断是否应该显示撤销按钮
+function shouldShowCancelBtn(proposalId, status, proposer) {
+  if (!proposer) return false;
+  if (status !== 1) return false; // 必须是押金中 (DepositPeriod)
+  if (typeof state === 'undefined' || !state.wallet || !state.wallet.address) return false;
+  return state.wallet.address === proposer;
+}
+
+// 渲染 proposer 显示 HTML
+function renderProposerHtml(proposalId, addr) {
+  if (!addr) return '未知';
+  const mine = (typeof state !== 'undefined' && state.wallet && state.wallet.address === addr);
+  const short = addr.length > 20 ? addr.slice(0, 12) + '...' + addr.slice(-6) : addr;
+  return mine
+    ? `<span id="proposer-${proposalId}" style="color:var(--primary);font-weight:600;">${short}</span> <span style="background:var(--primary);color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;">我</span>`
+    : `<span id="proposer-${proposalId}" title="${addr}">${short}</span>`;
+}
+
+// 渲染撤销按钮 HTML
+function renderCancelBtnHtml(proposalId) {
+  return `<button class="btn btn-ghost" style="padding:2px 10px;font-size:11px;color:var(--danger);border:1px solid var(--danger);border-radius:4px;" onclick="cancelProposal('${proposalId}')">${_t('proposal.cancelBtn','🗑 撤销提案')}</button>`;
+}
+
 // 查询提案发起人地址并回填到列表
 async function fetchProposer(proposalId, lcd) {
   const el = document.getElementById(`proposer-${proposalId}`);
-  if (!el) return;
   try {
-    let addr = null;
-    // v1beta1: /cosmos/gov/v1beta1/proposals/{id}/proposer → { proposer: "paxi1..." }
-    // v1:      /cosmos/gov/v1/proposals/{id}/proposer      → { proposer: "paxi1..." }
-    for (const apiVer of ['/cosmos/gov/v1beta1/proposals', '/cosmos/gov/v1/proposals']) {
-      try {
-        const res = await fetch(`${lcd}${apiVer}/${proposalId}/proposer`);
-        if (!res.ok) continue;
-        const data = await res.json();
-        addr = data.proposer || (data.proposal && data.proposal.proposer) || null;
-        if (addr) break;
-      } catch (e) { /* try next */ }
+    let addr = _proposalProposerMap[proposalId] || null;
+    // 尝试从单独的 proposer API 查询
+    if (!addr) {
+      for (const apiVer of ['/cosmos/gov/v1beta1/proposals', '/cosmos/gov/v1/proposals']) {
+        try {
+          const res = await fetch(`${lcd}${apiVer}/${proposalId}/proposer`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          console.debug('[fetchProposer] API resp:', proposalId, data);
+          addr = data.proposer || (data.proposal && data.proposal.proposer) || null;
+          if (addr) break;
+        } catch (e) { /* try next */ }
+      }
+    }
+    // 再试一次：直接查单条 proposal 详情，数据里可能有 proposer
+    if (!addr) {
+      for (const apiVer of ['/cosmos/gov/v1beta1/proposals', '/cosmos/gov/v1/proposals']) {
+        try {
+          const res = await fetch(`${lcd}${apiVer}/${proposalId}`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const p = data.proposal || data;
+          addr = p.proposer || (p.proposal && p.proposal.proposer) || null;
+          if (addr) break;
+        } catch (e) { /* try next */ }
+      }
     }
     if (addr) {
-      // 如果是当前钱包地址，高亮标记
-      const mine = (typeof state !== 'undefined' && state.wallet && state.wallet.address === addr);
-      const short = addr.length > 20 ? addr.slice(0, 12) + '...' + addr.slice(-6) : addr;
-      el.innerHTML = mine
-        ? `<span style="color:var(--primary);font-weight:600;">${short}</span> <span style="background:var(--primary);color:#fff;padding:1px 6px;border-radius:4px;font-size:10px;">我</span>`
-        : `<span title="${addr}">${short}</span>`;
+      _proposalProposerMap[proposalId] = addr;
+      // 替换显示
+      if (el) {
+        const mine = (typeof state !== 'undefined' && state.wallet && state.wallet.address === addr);
+        const short = addr.length > 20 ? addr.slice(0, 12) + '...' + addr.slice(-6) : addr;
+        el.outerHTML = renderProposerHtml(proposalId, addr);
+      }
+      // 如果是本人的提案且处于押金中状态，显示撤销按钮
+      const status = _proposalStatusMap[proposalId];
+      if (shouldShowCancelBtn(proposalId, status, addr)) {
+        const cancelBtnEl = document.getElementById(`cancel-btn-${proposalId}`);
+        if (cancelBtnEl) cancelBtnEl.innerHTML = renderCancelBtnHtml(proposalId);
+      }
     } else {
-      el.textContent = '未知';
+      if (el) el.textContent = '未知';
     }
   } catch (e) {
-    el.textContent = '查询失败';
+    console.error('[fetchProposer] error:', proposalId, e);
+    if (el) el.textContent = '查询失败';
   }
 }
 
 window.TOOL_REGISTRY['proposal'] = { render: renderProposal, bind: bindProposalEvents, onMount: bindProposalEvents };
+window.cancelProposal = cancelProposal;

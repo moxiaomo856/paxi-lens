@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Paxi 链上监测</title>
+  <meta name="description" content="Paxi Network 地址余额与交易监测仪表盘">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%233b82f6'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='white'>M</text></svg>">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --bg-hover: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #60a5fa;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: #334155;
+      --radius: 12px;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      overscroll-behavior-y: none;
+    }
+    .header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 16px; color: white;
+      flex-shrink: 0;
+    }
+    .header-title { font-size: 15px; font-weight: 700; white-space: nowrap; }
+    .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .network-select {
+      padding: 6px 10px; font-size: 12px; border-radius: 6px;
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      font-family: sans-serif;
+    }
+    .btn {
+      padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 14px; font-weight: 600; transition: all 0.15s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 44px;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:active { background: var(--primary-hover); }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:active { background: var(--bg-hover); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-sm { padding: 6px 10px; font-size: 12px; min-height: 32px; }
+    .btn-xs { padding: 3px 8px; font-size: 11px; min-height: 26px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .main { max-width: 720px; margin: 0 auto; padding: 12px 16px; padding-bottom: calc(72px + var(--safe-bottom)); }
+
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+    }
+    .card-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .card-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    input[type="text"], input[type="number"], textarea, select {
+      width: 100%; padding: 12px 14px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text);
+      font-size: 14px; font-family: inherit;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary); }
+    .form-row { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+    @media (max-width: 400px) { .form-row { grid-template-columns: 1fr; } }
+
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid var(--border); border-top-color: var(--primary);
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status-msg {
+      padding: 10px 14px; border-radius: 8px; font-size: 13px;
+      font-weight: 500; margin-top: 12px; display: none; word-break: break-word;
+    }
+    .status-msg.success { background: rgba(34,197,94,0.15); color: var(--success); display: block; }
+    .status-msg.error { background: rgba(239,68,68,0.15); color: var(--danger); display: block; }
+    .status-msg.info { background: rgba(59,130,246,0.15); color: var(--primary); display: block; }
+    .status-msg.warning { background: rgba(245,158,11,0.15); color: var(--warning); display: block; }
+
+    /* ====== 通知条 ====== */
+    #notifyBar {
+      position: sticky; top: 62px; z-index: 50;
+      margin: -12px -16px 12px; padding: 10px 16px;
+      display: none; align-items: center; justify-content: space-between; gap: 10px;
+      background: rgba(59,130,246,0.15); color: var(--primary);
+      border-bottom: 1px solid var(--primary);
+      font-size: 13px; font-weight: 600;
+    }
+    #notifyBar.show { display: flex; }
+    #notifyBar.success { background: rgba(34,197,94,0.15); color: var(--success); border-color: var(--success); }
+    #notifyBar.warning { background: rgba(245,158,11,0.15); color: var(--warning); border-color: var(--warning); }
+    #notifyBar.danger { background: rgba(239,68,68,0.15); color: var(--danger); border-color: var(--danger); }
+
+    /* ====== 地址卡片 ====== */
+    .addr-card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px; margin-bottom: 10px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+    .addr-card.changed {
+      border-color: var(--warning);
+      animation: pulse-border 1.5s ease;
+    }
+    @keyframes pulse-border {
+      0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(245,158,11,0); }
+    }
+    .addr-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px; gap: 8px;
+    }
+    .addr-label {
+      font-weight: 700; font-size: 14px;
+      display: flex; align-items: center; gap: 6px;
+      min-width: 0;
+    }
+    .addr-tag {
+      font-size: 10px; background: var(--primary); color: white;
+      padding: 1px 6px; border-radius: 4px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .addr-value {
+      font-family: monospace; font-size: 11px; color: var(--text-muted);
+      word-break: break-all; line-height: 1.4;
+    }
+    .addr-balance {
+      margin-top: 8px;
+      display: flex; justify-content: space-between; align-items: baseline;
+      flex-wrap: wrap; gap: 6px;
+    }
+    .bal-number {
+      font-size: 22px; font-weight: 800; color: var(--text);
+      font-family: 'Segoe UI', monospace;
+    }
+    .bal-unit { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+    .bal-delta {
+      font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    }
+    .bal-delta.up { background: rgba(34,197,94,0.15); color: var(--success); }
+    .bal-delta.down { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .bal-delta.none { background: var(--bg-hover); color: var(--text-muted); }
+    .addr-meta {
+      margin-top: 8px; padding-top: 8px;
+      border-top: 1px dashed var(--border);
+      font-size: 11px; color: var(--text-muted);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px;
+    }
+    .addr-actions {
+      display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
+    }
+    .badge-change {
+      position: absolute; top: -6px; right: -6px;
+      background: var(--warning); color: white;
+      font-size: 10px; font-weight: 700;
+      padding: 2px 8px; border-radius: 999px;
+      display: none;
+    }
+    .badge-change.show { display: inline-block; }
+
+    /* ====== 历史日志 ====== */
+    .log-list { max-height: 320px; overflow-y: auto; }
+    .log-item {
+      padding: 8px 10px; font-size: 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .log-item:last-child { border-bottom: none; }
+    .log-time { color: var(--text-muted); font-family: monospace; flex-shrink: 0; font-size: 10px; min-width: 120px; padding-top: 2px; }
+    .log-content { flex: 1; min-width: 0; word-break: break-word; }
+    .log-level {
+      padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700;
+      flex-shrink: 0; margin-top: 2px;
+    }
+    .log-level.info { background: rgba(59,130,246,0.15); color: var(--primary); }
+    .log-level.success { background: rgba(34,197,94,0.15); color: var(--success); }
+    .log-level.warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+    .log-level.danger { background: rgba(239,68,68,0.15); color: var(--danger); }
+
+    .empty-tip {
+      text-align: center; padding: 30px 10px;
+      color: var(--text-muted); font-size: 13px;
+    }
+
+    .section-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+    }
+
+    /* 交易列表 */
+    .tx-list { font-size: 12px; margin-top: 8px; }
+    .tx-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 0; border-bottom: 1px dashed var(--border); gap: 8px;
+    }
+    .tx-item:last-child { border-bottom: none; }
+    .tx-hash { font-family: monospace; font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55%; }
+    .tx-amt { font-weight: 700; }
+    .tx-amt.in { color: var(--success); }
+    .tx-amt.out { color: var(--danger); }
+    .tx-amt.fee { color: var(--text-muted); }
+    .tx-height { font-size: 10px; color: var(--text-muted); }
+
+    .inline-btn {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 11px;
+      text-decoration: underline; padding: 0;
+    }
+    .inline-btn:hover { color: var(--primary); }
+
+    .summary-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 10px; margin-bottom: 12px;
+    }
+    @media (max-width: 400px) { .summary-grid { grid-template-columns: 1fr 1fr; } }
+    .summary-item {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px; text-align: center;
+    }
+    .summary-num { font-size: 18px; font-weight: 800; color: var(--primary); }
+    .summary-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div class="header-left">
+      <button class="btn btn-outline btn-sm" onclick="goBack()" style="min-height:32px;padding:4px 10px;">←</button>
+      <div class="logo">M</div>
+      <div>
+        <div class="header-title" data-i18n="title">Paxi 链上监测</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <select id="networkSel" class="network-select" onchange="onNetworkChange()">
+        <option value="mainnet">主网 Mainnet</option>
+        <option value="testnet">测试网 Testnet</option>
+      </select>
+      <select id="langSel" class="network-select" onchange="onLangChange()">
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- 通知条 -->
+    <div id="notifyBar">
+      <span id="notifyText"></span>
+      <button class="btn btn-xs btn-outline" onclick="hideNotify()">✕</button>
+    </div>
+
+    <!-- ===== 汇总统计 ===== -->
+    <div class="card">
+      <div class="section-head">
+        <div class="card-title" style="margin-bottom:0;">📊 <span data-i18n="summary">汇总统计</span></div>
+        <button class="btn btn-primary btn-sm" id="btnRefreshAll" onclick="refreshAll()">
+          🔄 <span data-i18n="refreshAll">一键刷新</span>
+        </button>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-num" id="sumCount">0</div>
+          <div class="summary-label" data-i18n="sumAddr">监测地址</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-num" id="sumTotal">0.00</div>
+          <div class="summary-label" data-i18n="sumBal">总余额 PAXI</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-num" id="sumChanges">0</div>
+          <div class="summary-label" data-i18n="sumChg">变动次数</div>
+        </div>
+      </div>
+      <div class="card-desc" style="margin-bottom:0;" data-i18n="refreshHint">
+        💡 当前为手动刷新模式，点击上方「一键刷新」按钮即可查询所有地址最新状态。
+      </div>
+    </div>
+
+    <!-- ===== 添加地址 ===== -->
+    <div class="card">
+      <div class="card-title">➕ <span data-i18n="addTitle">添加监测地址</span></div>
+      <div class="card-desc" data-i18n="addDesc">输入 Paxi 地址（paxi1... 开头）和可选备注，加入监测列表。</div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" data-i18n="addrLabel">Paxi 地址</label>
+          <input type="text" id="addrInput" placeholder="paxi1xxxxxxxxxxxxxxxxxxxxx">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" data-i18n="tagLabel">备注 (可选)</label>
+          <input type="text" id="tagInput" placeholder="我的钱包 / 节点账户">
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:4px;" onclick="addAddress()">
+        ➕ <span data-i18n="addBtn">加入监测列表</span>
+      </button>
+      <div class="status-msg" id="addStatus"></div>
+    </div>
+
+    <!-- ===== 批量导入 ===== -->
+    <div class="card">
+      <div class="card-title">📋 <span data-i18n="bulkTitle">批量导入地址</span></div>
+      <div class="card-desc" data-i18n="bulkDesc">每行一个地址，支持「地址,备注」格式。也可点击下方按钮自动获取链上持币前200地址。</div>
+      <textarea id="bulkInput" rows="6" placeholder="paxi1abc123...\npaxi1def456...,我的钱包\npaxi1ghi789...,节点账户" style="font-family:monospace;font-size:13px;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" style="flex:1;min-width:140px;" onclick="bulkImport()">
+          📋 <span data-i18n="bulkImportBtn">批量导入</span>
+        </button>
+        <button class="btn btn-outline" style="flex:1;min-width:140px;" id="btnFetchTop" onclick="fetchTopHolders()">
+          🏆 <span data-i18n="fetchTopBtn">获取前200持币地址</span>
+        </button>
+      </div>
+      <div class="status-msg" id="bulkStatus"></div>
+    </div>
+
+    <!-- ===== 监测地址列表 ===== -->
+    <div class="card">
+      <div class="section-head">
+        <div class="card-title" style="margin-bottom:0;">📋 <span data-i18n="listTitle">监测地址列表</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-outline btn-sm" onclick="exportData()">⬇️ <span data-i18n="exportBtn">导出数据</span></button>
+          <button class="btn btn-outline btn-sm" onclick="clearAllAddr()" style="color:var(--danger);border-color:var(--danger);">🗑 <span data-i18n="clearAllBtn">清空全部</span></button>
+        </div>
+      </div>
+      <div id="addrList">
+        <div class="empty-tip" id="addrEmptyTip">
+          ⚠️ <span data-i18n="emptyTip">暂无监测地址，请先在上方添加</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 历史日志 ===== -->
+    <div class="card">
+      <div class="section-head">
+        <div class="card-title" style="margin-bottom:0;">📜 <span data-i18n="logTitle">历史日志</span></div>
+        <button class="btn btn-outline btn-sm btn-danger" onclick="clearLogs()" style="color:var(--danger);border-color:var(--danger);">
+          🗑 <span data-i18n="clearLogBtn">清空日志</span>
+        </button>
+      </div>
+      <div class="log-list" id="logList">
+        <div class="empty-tip" id="logEmptyTip">
+          📭 <span data-i18n="emptyLog">暂无日志记录</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:20px;"></div>
+  </div>
+
+  <!-- ====== 外部依赖（本页面完全独立，不加载 shared.js 避免变量冲突） ====== -->
+  <script src="https://mainnet-api.paxinet.io/resources/js/paxi-cosmjs.umd.js"></script>
+
+  <script>
+  // ============================================================
+  //  Paxi 链上监测仪表盘
+  // ============================================================
+
+  // ---------- i18n ----------
+  const I18N = {
+    zh: {
+      title: 'Paxi 链上监测',
+      summary: '汇总统计',
+      refreshAll: '一键刷新',
+      sumAddr: '监测地址',
+      sumBal: '总余额 PAXI',
+      sumChg: '变动次数',
+      refreshHint: '💡 当前为手动刷新模式，点击上方「一键刷新」按钮即可查询所有地址最新状态。',
+      addTitle: '添加监测地址',
+      addDesc: '输入 Paxi 地址（paxi1... 开头）和可选备注，加入监测列表。',
+      addrLabel: 'Paxi 地址',
+      tagLabel: '备注 (可选)',
+      addBtn: '加入监测列表',
+      listTitle: '监测地址列表',
+      exportBtn: '导出数据',
+      clearAllBtn: '清空全部',
+      clearAllConfirm: '确定清空所有监测地址吗？历史日志会保留。',
+      clearAllOk: '已清空全部地址',
+      emptyTip: '暂无监测地址，请先在上方添加',
+      logTitle: '历史日志',
+      clearLogBtn: '清空日志',
+      emptyLog: '暂无日志记录',
+      // 动态文本
+      invAddr: '请输入有效的 paxi1 开头地址',
+      dupAddr: '该地址已在监测列表中',
+      addOk: '添加成功',
+      bulkTitle: '批量导入地址',
+      bulkDesc: '每行一个地址，支持「地址,备注」格式。也可点击下方按钮自动获取链上持币前200地址。',
+      bulkImportBtn: '批量导入',
+      fetchTopBtn: '获取前200持币地址',
+      bulkEmpty: '请粘贴至少一个地址',
+      bulkOk: '成功导入 {ok} 个地址',
+      bulkDup: '{dup} 个地址已在列表中',
+      bulkInvalid: '{invalid} 个地址格式无效',
+      fetchTopLoading: '正在获取持币排名...',
+      fetchTopOk: '成功获取 {n} 个持币地址',
+      fetchTopErr: '获取持币地址失败',
+      refresh: '刷新中...',
+      bal: '余额',
+      lastTx: '最近交易',
+      noneTx: '暂无交易',
+      chg: '余额变动',
+      chgUp: '增加',
+      chgDown: '减少',
+      noChg: '无变化',
+      delConfirm: '确定从监测列表中移除此地址吗？（历史日志会保留）',
+      delOk: '已移除',
+      logAdd: '添加地址',
+      logDel: '移除地址',
+      logRefresh: '一键刷新完成',
+      logBalUp: '余额 ↑ 增加',
+      logBalDown: '余额 ↓ 减少',
+      logBalNo: '余额无变化',
+      logNewTx: '发现新交易',
+      logErr: '查询失败',
+      noTx: '暂无交易',
+      exportOk: '已导出 JSON 到剪贴板',
+      clearOk: '日志已清空',
+      notifyChg: '📢 监测到 {n} 个地址余额或交易有变动！',
+      at: '于',
+      txIn: '入账',
+      txOut: '出账',
+    },
+    en: {
+      title: 'Paxi Chain Monitor',
+      summary: 'Summary',
+      refreshAll: 'Refresh All',
+      sumAddr: 'Addresses',
+      sumBal: 'Total PAXI',
+      sumChg: 'Changes',
+      refreshHint: '💡 Manual refresh mode. Click "Refresh All" to query the latest status of all addresses.',
+      addTitle: 'Add Address',
+      addDesc: 'Enter a Paxi address (starting with paxi1...) and optional tag to monitor.',
+      addrLabel: 'Paxi Address',
+      tagLabel: 'Tag (Optional)',
+      addBtn: 'Add to Monitor',
+      listTitle: 'Address List',
+      exportBtn: 'Export Data',
+      clearAllBtn: 'Clear All',
+      clearAllConfirm: 'Clear all monitored addresses? Logs will be preserved.',
+      clearAllOk: 'All addresses cleared',
+      emptyTip: 'No addresses yet. Add one above.',
+      logTitle: 'History Log',
+      clearLogBtn: 'Clear Logs',
+      emptyLog: 'No log entries',
+      invAddr: 'Please enter a valid paxi1 address',
+      dupAddr: 'Address already in the monitoring list',
+      addOk: 'Added successfully',
+      bulkTitle: 'Bulk Import',
+      bulkDesc: 'One address per line. Supports "address,tag" format. Or click the button to auto-fetch top 200 holders.',
+      bulkImportBtn: 'Bulk Import',
+      fetchTopBtn: 'Fetch Top 200 Holders',
+      bulkEmpty: 'Please paste at least one address',
+      bulkOk: 'Imported {ok} addresses',
+      bulkDup: '{dup} addresses already in list',
+      bulkInvalid: '{invalid} invalid addresses',
+      fetchTopLoading: 'Fetching top holders...',
+      fetchTopOk: 'Fetched {n} holder addresses',
+      fetchTopErr: 'Failed to fetch top holders',
+      refresh: 'Refreshing...',
+      bal: 'Balance',
+      lastTx: 'Recent Tx',
+      noneTx: 'No transactions',
+      chg: 'Change',
+      chgUp: 'Up',
+      chgDown: 'Down',
+      noChg: 'No change',
+      delConfirm: 'Remove this address from monitor? (logs will be preserved)',
+      delOk: 'Removed',
+      logAdd: 'Address added',
+      logDel: 'Address removed',
+      logRefresh: 'Refresh all completed',
+      logBalUp: 'Balance ↑ Increased',
+      logBalDown: 'Balance ↓ Decreased',
+      logBalNo: 'Balance unchanged',
+      logNewTx: 'New transaction found',
+      logErr: 'Query failed',
+      noTx: 'No tx history',
+      exportOk: 'JSON copied to clipboard',
+      clearOk: 'Logs cleared',
+      notifyChg: '📢 {n} address(es) have balance or tx changes!',
+      at: 'at',
+      txIn: 'In',
+      txOut: 'Out',
+    }
+  };
+  let CURRENT_LANG = localStorage.getItem('monitor_lang') || 'zh';
+  function t(k) { return (I18N[CURRENT_LANG] && I18N[CURRENT_LANG][k]) || (I18N.zh[k] || k); }
+  function applyI18n() {
+    document.documentElement.lang = CURRENT_LANG === 'zh' ? 'zh-CN' : 'en';
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    document.title = t('title');
+  }
+  function onLangChange() {
+    CURRENT_LANG = document.getElementById('langSel').value;
+    localStorage.setItem('monitor_lang', CURRENT_LANG);
+    applyI18n();
+    renderAll();
+  }
+
+  // ---------- Network ----------
+  const NETWORKS = {
+    mainnet: {
+      lcd: 'https://mainnet-lcd.paxinet.io',
+      denom: 'upaxi',
+      chainId: 'paxi-mainnet',
+      display: 'PAXI',
+    },
+    testnet: {
+      lcd: 'https://testnet-lcd.paxinet.io',
+      denom: 'upaxi',
+      chainId: 'paxi-testnet',
+      display: 'tPAXI',
+    }
+  };
+  let CURRENT_NET = localStorage.getItem('monitor_net') || 'mainnet';
+  function getCfg() { return NETWORKS[CURRENT_NET] || NETWORKS.mainnet; }
+  function onNetworkChange() {
+    CURRENT_NET = document.getElementById('networkSel').value;
+    localStorage.setItem('monitor_net', CURRENT_NET);
+    // 切换网络后清除缓存的余额快照（不同链余额不同）
+    STATE.addresses.forEach(a => { a.prevBalance = null; a.prevTxCount = null; a.txCache = []; });
+    saveState();
+    renderAll();
+    addLog('info', `🔀 ${t('logRefresh')} (${CURRENT_NET})`);
+  }
+
+  // ---------- State ----------
+  const STORAGE_KEY = 'paxi_monitor_state_v1';
+  const STATE = {
+    addresses: [], // [{ id, addr, tag, balance, prevBalance, txCount, prevTxCount, lastCheck, txCache }]
+    logs: [],      // [{ ts, level, content }]
+    totalChanges: 0,
+  };
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(STATE)); } catch(e){}
+  }
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) Object.assign(STATE, JSON.parse(raw));
+      if (!Array.isArray(STATE.addresses)) STATE.addresses = [];
+      if (!Array.isArray(STATE.logs)) STATE.logs = [];
+      if (typeof STATE.totalChanges !== 'number') STATE.totalChanges = 0;
+    } catch(e){}
+  }
+
+  // ---------- Utils ----------
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function fmtTime(ts) {
+    const d = new Date(ts || Date.now());
+    const pad = n => String(n).padStart(2,'0');
+    return `${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+  function fmtFullTime(ts) {
+    const d = new Date(ts || Date.now());
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+  function upaxiToPaxi(v) {
+    if (v == null || v === '') return '0.00';
+    const n = typeof v === 'bigint' ? Number(v) : Number(v);
+    if (isNaN(n)) return '0.00';
+    return (n / 1e6).toFixed(6).replace(/\.?0+$/, '') || '0';
+  }
+  function fmtPaxi(v) {
+    let s = upaxiToPaxi(v);
+    if (s.includes('.')) {
+      const [a,b] = s.split('.');
+      s = a + '.' + (b + '000000').slice(0,2);
+    } else {
+      s = s + '.00';
+    }
+    return s;
+  }
+  function showStatus(id, msg, type) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'status-msg ' + (type || 'info');
+    el.textContent = msg;
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.display = 'none'; }, 5000);
+  }
+  function showNotify(msg, level) {
+    const bar = document.getElementById('notifyBar');
+    const txt = document.getElementById('notifyText');
+    bar.className = '';
+    if (level) bar.classList.add(level);
+    txt.textContent = msg;
+    bar.classList.add('show');
+  }
+  function hideNotify() {
+    document.getElementById('notifyBar').classList.remove('show');
+  }
+  function goBack() {
+    if (window.history.length > 1 && document.referrer) window.history.back();
+    else window.location.href = '../index.html';
+  }
+
+  // ---------- Logging ----------
+  function addLog(level, content, addrId) {
+    const entry = { ts: Date.now(), level, content, addrId: addrId || null };
+    STATE.logs.unshift(entry);
+    if (STATE.logs.length > 500) STATE.logs.pop();
+    saveState();
+    renderLogs();
+  }
+  function clearLogs() {
+    if (!confirm(t('clearOk')+'?')) return;
+    STATE.logs = [];
+    saveState();
+    renderLogs();
+  }
+
+  // ---------- Address CRUD ----------
+  function addAddress() {
+    const addr = document.getElementById('addrInput').value.trim();
+    const tag = document.getElementById('tagInput').value.trim();
+    if (!/^paxi1[a-z0-9]{38,58}$/.test(addr)) {
+      showStatus('addStatus', t('invAddr'), 'error');
+      return;
+    }
+    if (STATE.addresses.some(a => a.addr === addr)) {
+      showStatus('addStatus', t('dupAddr'), 'warning');
+      return;
+    }
+    const entry = {
+      id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      addr, tag: tag || '',
+      balance: null, prevBalance: null,
+      txCount: 0, prevTxCount: 0,
+      lastCheck: null,
+      txCache: [],
+    };
+    STATE.addresses.unshift(entry);
+    saveState();
+    document.getElementById('addrInput').value = '';
+    document.getElementById('tagInput').value = '';
+    showStatus('addStatus', t('addOk'), 'success');
+    addLog('info', `${t('logAdd')}: ${addr}${tag ? ` (${tag})` : ''}`, entry.id);
+    renderAll();
+    // 自动刷新新添加的这个
+    setTimeout(() => refreshOne(entry.id), 100);
+  }
+
+  // ---------- 批量导入 ----------
+  function bulkImport() {
+    const text = document.getElementById('bulkInput').value.trim();
+    if (!text) {
+      showStatus('bulkStatus', t('bulkEmpty'), 'warning');
+      return;
+    }
+    const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+    let ok = 0, dup = 0, invalid = 0;
+    const existingAddrs = new Set(STATE.addresses.map(a => a.addr));
+    const newEntries = [];
+    for (const line of lines) {
+      // 支持 "地址,备注" 或 "地址 备注" 或纯地址
+    const parts = line.split(/[,\t]/).map(s => s.trim());
+      const addr = parts[0];
+      const tag = parts[1] || '';
+      if (!/^paxi1[a-z0-9]{38,58}$/.test(addr)) { invalid++; continue; }
+      if (existingAddrs.has(addr)) { dup++; continue; }
+      existingAddrs.add(addr);
+      newEntries.push({
+        id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+        addr, tag: tag || '',
+        balance: null, prevBalance: null,
+        txCount: 0, prevTxCount: 0,
+        lastCheck: null,
+        txCache: [],
+      });
+      ok++;
+    }
+    if (newEntries.length) {
+      STATE.addresses.unshift(...newEntries);
+      saveState();
+      addLog('success', `${t('bulkImportBtn')}: +${ok}${dup?` (${dup} ${t('bulkDup').replace('{dup}','')})`:''}`);
+    }
+    // 构建提示
+    let msg = t('bulkOk').replace('{ok}', ok);
+    if (dup > 0) msg += '，' + t('bulkDup').replace('{dup}', dup);
+    if (invalid > 0) msg += '，' + t('bulkInvalid').replace('{invalid}', invalid);
+    showStatus('bulkStatus', msg, ok > 0 ? 'success' : 'warning');
+    document.getElementById('bulkInput').value = '';
+    renderAll();
+    // 自动刷新新增的地址（逐个，避免并发太多）
+    newEntries.forEach((e, i) => {
+      setTimeout(() => refreshOne(e.id), 200 + i * 150);
+    });
+  }
+
+  // ---------- 获取前200持币地址 ----------
+  async function fetchTopHolders() {
+    const btn = document.getElementById('btnFetchTop');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> ' + t('fetchTopLoading');
+    showStatus('bulkStatus', t('fetchTopLoading'), 'info');
+    try {
+      const cfg = getCfg();
+      const lcd = cfg.lcd;
+      // 方案1：Cosmos SDK bank 模块 supply + pagination 查询所有余额
+      // 方案2：如果链有 mint 模块的 account 列表
+      // 最可靠：用 bank v1beta1 total supply 分页拉取，按余额排序
+      const holders = [];
+      let nextKey = null;
+      const maxPages = 20; // 每页 100，20 页最多 2000 条，取前 200
+      for (let page = 0; page < maxPages; page++) {
+        let url = `${lcd}/cosmos/bank/v1beta1/denom_owners?denom=${cfg.denom}&pagination.limit=100`;
+        if (nextKey) url += `&pagination.key=${encodeURIComponent(nextKey)}`;
+        const r = await fetch(url);
+        if (!r.ok) break;
+        const d = await r.json();
+        const owners = d?.denom_owners || [];
+        if (!owners.length) break;
+        for (const o of owners) {
+          const balStr = o.balance?.amount || '0';
+          holders.push({ addr: o.address, balance: balStr });
+        }
+        nextKey = d?.pagination?.next_key;
+        if (!nextKey) break;
+      }
+      // 按余额倒序排序，取前 200
+      holders.sort((a, b) => {
+        const ba = BigInt(a.balance), bb = BigInt(b.balance);
+        if (ba > bb) return -1;
+        if (ba < bb) return 1;
+        return 0;
+      });
+      const top = holders.slice(0, 200);
+
+      // 导入到监测列表
+      const existingAddrs = new Set(STATE.addresses.map(a => a.addr));
+      let ok = 0, dup = 0;
+      const newEntries = [];
+      for (let i = 0; i < top.length; i++) {
+        const h = top[i];
+        if (existingAddrs.has(h.addr)) { dup++; continue; }
+        existingAddrs.add(h.addr);
+        newEntries.push({
+          id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,8),
+          addr: h.addr,
+          tag: `Top ${i + 1}`,
+          balance: h.balance, prevBalance: null,
+          txCount: 0, prevTxCount: 0,
+          lastCheck: Date.now(),
+          txCache: [],
+        });
+        ok++;
+      }
+      if (newEntries.length) {
+        STATE.addresses.unshift(...newEntries);
+        saveState();
+        addLog('success', `${t('fetchTopOk').replace('{n}', ok)}${dup?` (${dup} ${t('bulkDup').replace('{dup}','')})`:''}`);
+      }
+      const msg = t('fetchTopOk').replace('{n}', ok) + (dup > 0 ? '，' + t('bulkDup').replace('{dup}', dup) : '');
+      showStatus('bulkStatus', msg, 'success');
+      renderAll();
+      // 持币地址已有余额，不需要刷新余额，但异步补充交易记录
+      newEntries.forEach((e, i) => {
+        setTimeout(() => { queryTxs(e.addr).then(txs => {
+          e.txCache = txs; e.txCount = txs.length; saveState(); renderAddressList();
+        }).catch(()=>{}); }, 300 + i * 100);
+      });
+    } catch (e) {
+      console.error('fetchTopHolders error:', e);
+      showStatus('bulkStatus', t('fetchTopErr') + ': ' + (e.message || String(e)), 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '🏆 ' + t('fetchTopBtn');
+    }
+  }
+
+  function deleteAddress(id) {
+    if (!confirm(t('delConfirm'))) return;
+    const a = STATE.addresses.find(x => x.id === id);
+    STATE.addresses = STATE.addresses.filter(x => x.id !== id);
+    saveState();
+    if (a) addLog('warning', `${t('logDel')}: ${a.addr}${a.tag ? ` (${a.tag})` : ''}`, id);
+    renderAll();
+  }
+  function clearAllAddr() {
+    if (!STATE.addresses.length) return;
+    if (!confirm(t('clearAllConfirm'))) return;
+    const count = STATE.addresses.length;
+    STATE.addresses = [];
+    saveState();
+    addLog('warning', `${t('clearAllOk')} (${count})`);
+    renderAll();
+  }
+
+  // ---------- Chain Queries ----------
+  async function queryBalance(addr) {
+    const cfg = getCfg();
+    const r = await fetch(`${cfg.lcd}/cosmos/bank/v1beta1/balances/${addr}/by_denom?denom=${cfg.denom}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    return d?.balance?.amount || '0';
+  }
+  async function queryTxs(addr) {
+    const cfg = getCfg();
+    // Cosmos SDK tx 查询：传入 events = transfer.recipient=addr / transfer.sender=addr
+    // 为简化，先用 recipient，再用 sender，合并
+    const events = [
+      `transfer.recipient='${addr}'`,
+      `transfer.sender='${addr}'`,
+    ];
+    const allTxs = [];
+    const seenHashes = new Set();
+    for (const ev of events) {
+      try {
+        const url = `${cfg.lcd}/cosmos/tx/v1beta1/txs?events=${encodeURIComponent(ev)}&pagination.limit=5&order_by=ORDER_BY_DESC`;
+        const r = await fetch(url);
+        if (!r.ok) continue;
+        const d = await r.json();
+        const txs = d?.tx_responses || [];
+        for (const tx of txs) {
+          if (!tx || !tx.txhash) continue;
+          if (seenHashes.has(tx.txhash)) continue;
+          seenHashes.add(tx.txhash);
+          // 判断收支方向：解析 messages 里的 MsgSend
+          let amountIn = 0n, amountOut = 0n;
+          const txBody = d?.tx?.body;
+          const messages = txBody?.messages || [];
+          for (const m of messages) {
+            if (!m || !m['@type']) continue;
+            const isSend = m['@type'].includes('MsgSend');
+            if (!isSend) continue;
+            const amtList = m.amount || [];
+            const sum = amtList.reduce((acc, c) => {
+              if (c.denom === cfg.denom) return acc + BigInt(c.amount || 0);
+              return acc;
+            }, 0n);
+            if (m.to_address === addr) amountIn += sum;
+            if (m.from_address === addr) amountOut += sum;
+          }
+          allTxs.push({
+            txhash: tx.txhash,
+            height: tx.height,
+            timestamp: tx.timestamp || null,
+            code: Number(tx.code || 0),
+            in: amountIn,
+            out: amountOut,
+            fee: tx.fee?.amount || [],
+          });
+        }
+      } catch (e) {}
+    }
+    // 按 height 倒序
+    allTxs.sort((a,b) => Number(b.height || 0) - Number(a.height || 0));
+    return allTxs.slice(0, 5);
+  }
+
+  // ---------- Refresh ----------
+  async function refreshOne(id) {
+    const a = STATE.addresses.find(x => x.id === id);
+    if (!a) return;
+    const cardEl = document.querySelector(`[data-addr-id="${id}"]`);
+    const btnEl = document.getElementById(`btn_refresh_${id}`);
+    const badgeEl = document.getElementById(`badge_${id}`);
+    if (cardEl) cardEl.classList.remove('changed');
+    if (badgeEl) badgeEl.classList.remove('show');
+    if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = '<span class="spinner"></span>'; }
+
+    let changedNow = false;
+    let deltaPaxi = null;
+    let dir = null;
+
+    try {
+      const bal = await queryBalance(a.addr);
+      const txs = await queryTxs(a.addr);
+      // 快照
+      a.prevBalance = a.balance;
+      a.balance = bal;
+      a.prevTxCount = a.txCount;
+      a.txCount = txs.length;
+      a.txCache = txs;
+      a.lastCheck = Date.now();
+
+      // 判断变化
+      if (a.prevBalance != null && BigInt(a.prevBalance) !== BigInt(a.balance)) {
+        changedNow = true;
+        const diff = BigInt(a.balance) - BigInt(a.prevBalance);
+        deltaPaxi = upaxiToPaxi(diff.toString());
+        dir = diff > 0n ? 'up' : 'down';
+        STATE.totalChanges++;
+        addLog(dir === 'up' ? 'success' : 'danger',
+          `${escapeHtml(a.tag || a.addr.slice(0,12)+'...')} ${t('logBal'+(dir==='up'?'Up':'Down'))} ${dir==='up'?'+':''}${deltaPaxi} ${getCfg().display}`,
+          a.id);
+      } else if (a.prevTxCount != null && a.txCount > a.prevTxCount) {
+        changedNow = true;
+        STATE.totalChanges++;
+        addLog('warning',
+          `${escapeHtml(a.tag || a.addr.slice(0,12)+'...')} ${t('logNewTx')} (+${a.txCount - a.prevTxCount})`,
+          a.id);
+      } else {
+        addLog('info',
+          `${escapeHtml(a.tag || a.addr.slice(0,12)+'...')} ${t('logBalNo')} (${fmtPaxi(a.balance)} ${getCfg().display})`,
+          a.id);
+      }
+    } catch (e) {
+      addLog('danger',
+        `${escapeHtml(a.tag || a.addr.slice(0,12)+'...')} ${t('logErr')}: ${e.message || String(e)}`,
+        a.id);
+    } finally {
+      if (changedNow) {
+        if (cardEl) cardEl.classList.add('changed');
+        if (badgeEl) badgeEl.classList.add('show');
+      }
+      if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '🔄'; }
+      saveState();
+      renderSummary();
+      renderAddressList();
+      return changedNow;
+    }
+  }
+
+  async function refreshAll() {
+    if (!STATE.addresses.length) return;
+    const btn = document.getElementById('btnRefreshAll');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> ' + t('refresh');
+    let changes = 0;
+    addLog('info', `⏳ ${t('refresh')} (${STATE.addresses.length})`);
+    for (let i = 0; i < STATE.addresses.length; i++) {
+      const ok = await refreshOne(STATE.addresses[i].id);
+      if (ok) changes++;
+      // UI 让步，避免卡顿
+      await new Promise(r => setTimeout(r, 50));
+    }
+    addLog('success', `✅ ${t('logRefresh')}: ${STATE.addresses.length} ${changes?`(${t('chg')} ${changes})`:''}`);
+    btn.disabled = false;
+    btn.innerHTML = '🔄 ' + t('refreshAll');
+    if (changes > 0) {
+      showNotify(t('notifyChg').replace('{n}', changes), 'warning');
+      setTimeout(hideNotify, 8000);
+    } else {
+      hideNotify();
+    }
+  }
+
+  // ---------- Export ----------
+  async function exportData() {
+    const data = {
+      exportedAt: fmtFullTime(),
+      network: CURRENT_NET,
+      summary: {
+        count: STATE.addresses.length,
+        totalChanges: STATE.totalChanges,
+        totalBalance: fmtPaxi(
+          STATE.addresses.reduce((acc, a) => acc + BigInt(a.balance || 0), 0n).toString()
+        ),
+      },
+      addresses: STATE.addresses.map(a => ({
+        tag: a.tag, address: a.addr,
+        balance: upaxiToPaxi(a.balance),
+        lastCheck: a.lastCheck ? fmtFullTime(a.lastCheck) : null,
+        recentTx: a.txCache || [],
+      })),
+      logs: STATE.logs.slice(0, 100).map(l => ({
+        time: fmtFullTime(l.ts), level: l.level, content: l.content
+      })),
+    };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      alert(t('exportOk') + '\n\n总 ' + data.addresses.length + ' 个地址, ' + data.logs.length + ' 条日志');
+    } catch (e) {
+      // 降级：下载为文件
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const u = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = u;
+      a.download = `paxi-monitor-${CURRENT_NET}-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(u);
+    }
+  }
+
+  // ---------- Rendering ----------
+  function renderSummary() {
+    document.getElementById('sumCount').textContent = STATE.addresses.length;
+    const total = STATE.addresses.reduce((acc, a) => acc + BigInt(a.balance || 0), 0n);
+    document.getElementById('sumTotal').textContent = fmtPaxi(total.toString());
+    document.getElementById('sumChanges').textContent = STATE.totalChanges;
+  }
+
+  function renderAddressList() {
+    const wrap = document.getElementById('addrList');
+    if (!wrap) return;
+    if (!STATE.addresses.length) {
+      const tip = document.getElementById('addrEmptyTip');
+      wrap.innerHTML = '';
+      if (tip) wrap.appendChild(tip);
+      return;
+    }
+    // tip 可能已被之前的 innerHTML 替换移除，需要检查
+    const tip = document.getElementById('addrEmptyTip');
+    if (tip && tip.parentNode === wrap) tip.remove();
+    wrap.innerHTML = STATE.addresses.map(a => {
+      const bal = fmtPaxi(a.balance);
+      let deltaHtml = `<span class="bal-delta none">— ${t('noChg')}</span>`;
+      if (a.prevBalance != null && a.balance != null) {
+        const prev = BigInt(a.prevBalance);
+        const cur = BigInt(a.balance);
+        if (cur !== prev) {
+          const diff = cur - prev;
+          const sign = diff > 0n ? '+' : '';
+          const cls = diff > 0n ? 'up' : 'down';
+          const icon = diff > 0n ? '↑' : '↓';
+          deltaHtml = `<span class="bal-delta ${cls}">${icon} ${sign}${upaxiToPaxi(diff.toString())}</span>`;
+        }
+      }
+      const txs = a.txCache || [];
+      const display = getCfg().display;
+      const txHtml = txs.length ? txs.map(tx => {
+        const net = (tx.in || 0n) - (tx.out || 0n);
+        let amtCls = 'fee';
+        let amtTxt = `-`;
+        if (net > 0n) { amtCls = 'in'; amtTxt = `+${upaxiToPaxi(net.toString())} ${display}`; }
+        else if (net < 0n) { amtCls = 'out'; amtTxt = `${upaxiToPaxi(net.toString())} ${display}`; }
+        const h = tx.txhash || '';
+        const shortHash = h.length > 12 ? h.slice(0,8)+'...'+h.slice(-6) : h;
+        return `<div class="tx-item">
+          <div>
+            <div class="tx-hash" title="${escapeHtml(h)}">#${escapeHtml(tx.height||'?')} · ${escapeHtml(shortHash)}</div>
+            <div class="tx-height">${escapeHtml(tx.timestamp ? tx.timestamp.replace('T',' ').slice(0,16) : t('at')+' '+escapeHtml(tx.height))}</div>
+          </div>
+          <div class="tx-amt ${amtCls}">${escapeHtml(amtTxt)}</div>
+        </div>`;
+      }).join('') : `<div class="tx-item" style="color:var(--text-muted);">${t('noTx')}</div>`;
+
+      return `
+        <div class="addr-card" data-addr-id="${a.id}">
+          <div class="badge-change" id="badge_${a.id}">NEW</div>
+          <div class="addr-header">
+            <div class="addr-label" style="min-width:0;">
+              ${a.tag ? `<span class="addr-tag">${escapeHtml(a.tag)}</span>` : ''}
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(a.addr.slice(0,10)+'...'+a.addr.slice(-6))}</span>
+            </div>
+            <div style="display:flex;gap:4px;flex-shrink:0;">
+              <button class="btn btn-xs btn-outline" id="btn_refresh_${a.id}" onclick="refreshOne('${a.id}')" title="${t('refreshAll')}">🔄</button>
+              <button class="btn btn-xs btn-outline" style="color:var(--danger);" onclick="deleteAddress('${a.id}')" title="${t('delOk')}">🗑</button>
+            </div>
+          </div>
+          <div class="addr-value" title="${escapeHtml(a.addr)}">${escapeHtml(a.addr)}</div>
+          <div class="addr-balance">
+            <div>
+              <span class="bal-number">${escapeHtml(bal)}</span>
+              <span class="bal-unit"> ${display}</span>
+            </div>
+            ${deltaHtml}
+          </div>
+          <div class="addr-meta">
+            <span>${t('lastTx')}: ${txs.length || 0}</span>
+            <span>${t('at')}: ${a.lastCheck ? escapeHtml(fmtTime(a.lastCheck)) : '—'}</span>
+          </div>
+          <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:600;">🗂 ${t('lastTx')}</div>
+            <div class="tx-list">${txHtml}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderLogs() {
+    const wrap = document.getElementById('logList');
+    if (!wrap) return;
+    if (!STATE.logs.length) {
+      const tip = document.getElementById('logEmptyTip');
+      wrap.innerHTML = '';
+      if (tip) wrap.appendChild(tip);
+      return;
+    }
+    const tip = document.getElementById('logEmptyTip');
+    if (tip && tip.parentNode === wrap) tip.remove();
+    const LEVEL_LABEL = { info: 'INFO', success: 'OK', warning: 'WARN', danger: 'ERR' };
+    wrap.innerHTML = STATE.logs.slice(0, 200).map(l => `
+      <div class="log-item">
+        <span class="log-level ${l.level || 'info'}">${LEVEL_LABEL[l.level] || 'INFO'}</span>
+        <span class="log-time">${escapeHtml(fmtFullTime(l.ts))}</span>
+        <span class="log-content">${escapeHtml(l.content)}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderAll() {
+    renderSummary();
+    renderAddressList();
+    renderLogs();
+  }
+
+  // ---------- Init ----------
+  function init() {
+    loadState();
+    document.getElementById('langSel').value = CURRENT_LANG;
+    document.getElementById('networkSel').value = CURRENT_NET;
+    applyI18n();
+    renderAll();
+  }
+  init();
+  </script>
+</body>
+</html>

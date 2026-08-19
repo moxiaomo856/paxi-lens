@@ -27,10 +27,10 @@ const _NFT_LANG = {
     maxPerWallet: '每地址最大 Mint 数',
     deployBtn: '🚀 部署 NFT 合约',
     // Upload
-    uploadCover: 'NFT 封面图（仅用于本地预览，不存入链上）',
+    uploadCover: 'NFT 封面图',
     uploadCoverHint: '点击上传封面图',
     uploadSupport: '支持 JPG/PNG/GIF/SVG',
-    imageUri: '图片 IPFS/Arweave URI（可选，测试中可不填）',
+    imageUri: '图片 URI（关闭IPFS时使用，或覆盖IPFS图片）',
     // Preview
     preview: '预览',
     previewPlaceholder: '🖼️',
@@ -79,6 +79,25 @@ const _NFT_LANG = {
     // Misc
     max10Hint: '单次最多铸造 10 个 NFT',
     buildTx: '构建铸造交易...',
+    // IPFS
+    ipfsHint: '💡 上传的图片将自动存储到 IPFS，确保 NFT 永久可访问。',
+    ipfsToggle: '使用 IPFS 存储（推荐）',
+    ipfsConfig: '⚙️ IPFS 配置（Pinata）',
+    ipfsJwtLabel: 'Pinata JWT',
+    ipfsJwtPlaceholder: '粘贴你的 Pinata JWT...',
+    ipfsSave: '💾 保存',
+    ipfsConfigured: '✓ 已配置',
+    ipfsNotConfigured: '⚠ 未配置',
+    ipfsGetKey: '🔗 获取 Pinata JWT',
+    ipfsUploading: '上传中',
+    ipfsImageOk: '✅ 图片已上传到 IPFS',
+    ipfsMetaGen: '正在生成并上传元数据...',
+    ipfsUploadFail: '❌ IPFS 上传失败',
+    ipfsNoJwt: '请先在 IPFS 配置中填入 Pinata JWT',
+    ipfsGateway: '网关',
+    ipfsFallback: 'IPFS 不可用，已降级为基础模式',
+    ipfsNeedImage: '请先上传封面图或填写图片 URI',
+    ipfsLargeImg: '图片超过 100KB，建议开启 IPFS 以降低 Gas 费',
   },
   en: {
     title: '🎨 NFT Launcher',
@@ -98,10 +117,10 @@ const _NFT_LANG = {
     mintPrice: 'Mint Price (PAXI)',
     maxPerWallet: 'Max Mint per Wallet',
     deployBtn: '🚀 Deploy NFT Contract',
-    uploadCover: 'NFT Cover (local preview only, not on-chain)',
+    uploadCover: 'NFT Cover Image',
     uploadCoverHint: 'Click to upload cover image',
     uploadSupport: 'JPG/PNG/GIF/SVG supported',
-    imageUri: 'Image IPFS/Arweave URI (optional)',
+    imageUri: 'Image URI (used when IPFS off, or override)',
     preview: 'Preview',
     previewPlaceholder: '🖼️',
     batchMint: 'Batch Mint NFT',
@@ -144,6 +163,25 @@ const _NFT_LANG = {
     warningEn: '⚠️ This tool only provides technical services for NFT minting. No trading, pricing, or exchange functions are offered. Users bear all consequences.',
     max10Hint: 'Max 10 NFTs per transaction',
     buildTx: 'Building mint tx...',
+    // IPFS
+    ipfsHint: '💡 Uploaded images are stored on IPFS, ensuring permanent NFT access.',
+    ipfsToggle: 'Use IPFS storage (recommended)',
+    ipfsConfig: '⚙️ IPFS Config (Pinata)',
+    ipfsJwtLabel: 'Pinata JWT',
+    ipfsJwtPlaceholder: 'Paste your Pinata JWT...',
+    ipfsSave: '💾 Save',
+    ipfsConfigured: '✓ Configured',
+    ipfsNotConfigured: '⚠ Not configured',
+    ipfsGetKey: '🔗 Get Pinata JWT',
+    ipfsUploading: 'Uploading',
+    ipfsImageOk: '✅ Image uploaded to IPFS',
+    ipfsMetaGen: 'Generating & uploading metadata...',
+    ipfsUploadFail: '❌ IPFS upload failed',
+    ipfsNoJwt: 'Please enter your Pinata JWT in IPFS config first',
+    ipfsGateway: 'Gateway',
+    ipfsFallback: 'IPFS unavailable, fell back to basic mode',
+    ipfsNeedImage: 'Please upload a cover image or enter an image URI',
+    ipfsLargeImg: 'Image exceeds 100KB, enable IPFS to reduce gas fees',
   }
 };
 
@@ -155,6 +193,8 @@ function _nftL(k) {
 // Internal state
 let _nftStep = 1;
 let _nftCoverBase64 = null;
+let _nftCoverFile = null;
+let _nftIpfsImageCid = '';
 let _nftDeployed = JSON.parse(localStorage.getItem('paxi_nft_deployed') || '[]');
 
 // ========== RENDER ==========
@@ -232,6 +272,27 @@ function renderNftLauncher() {
       <!-- STEP 2: Upload -->
       <div id="nft-panel-2" style="display:none;background:var(--bg);border-radius:8px;padding:14px;margin-bottom:12px;">
         <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🖼️ ${l('step2')}</div>
+        <div class="info-box">${l('ipfsHint')}</div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;">
+            <input type="checkbox" id="nftUseIpfs" checked style="width:18px;height:18px;accent-color:var(--primary);">
+            ${l('ipfsToggle')}
+          </label>
+        </div>
+        <div id="nftIpfsConfigWrap" style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;">${l('ipfsConfig')}</div>
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label">${l('ipfsJwtLabel')}</label>
+            <div style="display:flex;gap:6px;">
+              <input type="password" id="nftPinataJwt" placeholder="${l('ipfsJwtPlaceholder')}" style="flex:1;">
+              <button class="btn btn-primary btn-sm" id="btnSaveJwt">${l('ipfsSave')}</button>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+            <span id="ipfsConfigStatus">${hasPinataJwt() ? l('ipfsConfigured') : l('ipfsNotConfigured')}</span>
+            <a href="https://app.pinata.cloud/keys" target="_blank" rel="noopener" style="color:var(--primary);font-size:11px;">${l('ipfsGetKey')}</a>
+          </div>
+        </div>
         <div class="form-group">
           <label class="form-label">${l('uploadCover')}</label>
           <div id="uploadCoverArea" style="border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all 0.15s;" onclick="document.getElementById('fileCover').click()">
@@ -241,6 +302,7 @@ function renderNftLauncher() {
             <img id="coverPreview" style="width:100px;height:100px;border-radius:12px;object-fit:cover;border:2px solid var(--border);margin:10px auto 0;display:none;">
           </div>
           <input type="file" id="fileCover" accept="image/*" style="display:none">
+          <div id="ipfsUploadStatus" style="margin-top:10px;"></div>
         </div>
         <div class="form-group">
           <label class="form-label">${l('imageUri')}</label>
@@ -417,6 +479,7 @@ function bindNftLauncherEvents() {
     if (fileEl) fileEl.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (file) {
+        _nftCoverFile = file;
         const reader = new FileReader();
         reader.onload = (ev) => {
           _nftCoverBase64 = ev.target.result;
@@ -424,6 +487,34 @@ function bindNftLauncherEvents() {
           if (prev) { prev.src = _nftCoverBase64; prev.style.display = 'block'; }
         };
         reader.readAsDataURL(file);
+        // 若开启 IPFS 则自动上传
+        _maybeUploadCoverToIpfs(file);
+      }
+    });
+
+    // IPFS toggle
+    const ipfsChk = document.getElementById('nftUseIpfs');
+    if (ipfsChk) ipfsChk.addEventListener('change', () => {
+      const cfg = document.getElementById('nftIpfsConfigWrap');
+      if (cfg) cfg.style.opacity = ipfsChk.checked ? '1' : '0.5';
+      if (ipfsChk.checked && _nftCoverFile && !_nftIpfsImageCid) _maybeUploadCoverToIpfs(_nftCoverFile);
+    });
+    // 初始态
+    const ipfsChk0 = document.getElementById('nftUseIpfs');
+    const cfgWrap = document.getElementById('nftIpfsConfigWrap');
+    if (ipfsChk0 && cfgWrap) cfgWrap.style.opacity = ipfsChk0.checked ? '1' : '0.5';
+
+    // Save JWT
+    const btnSaveJwt = document.getElementById('btnSaveJwt');
+    if (btnSaveJwt) btnSaveJwt.addEventListener('click', () => {
+      const val = document.getElementById('nftPinataJwt').value;
+      setPinataJwt(val);
+      const st = document.getElementById('ipfsConfigStatus');
+      if (st) st.textContent = hasPinataJwt() ? _nftL('ipfsConfigured') : _nftL('ipfsNotConfigured');
+      showToast(hasPinataJwt() ? _nftL('ipfsConfigured') : _nftL('ipfsNotConfigured'), hasPinataJwt() ? 'success' : 'warning');
+      if (hasPinataJwt() && _nftCoverFile && !_nftIpfsImageCid) {
+        const chk = document.getElementById('nftUseIpfs');
+        if (chk && chk.checked) _maybeUploadCoverToIpfs(_nftCoverFile);
       }
     });
 
@@ -441,6 +532,74 @@ function bindNftLauncherEvents() {
     const btnMeta = document.getElementById('btnMetadata');
     if (btnMeta) btnMeta.addEventListener('click', () => _genMetadata());
   }, 100);
+}
+
+// ========== IPFS 封面上传 ==========
+async function _maybeUploadCoverToIpfs(file) {
+  const chk = document.getElementById('nftUseIpfs');
+  if (!chk || !chk.checked) return;
+  if (!hasPinataJwt()) {
+    _setIpfsStatus('warning', _nftL('ipfsNoJwt'));
+    return;
+  }
+  const st = document.getElementById('ipfsUploadStatus');
+  try {
+    if (st) { st.innerHTML = `<span style="font-size:12px;color:var(--primary)"><span class="spinner"></span> ${_nftL('ipfsUploading')}... 0%</span>`; }
+    const res = await uploadFileToIpfs(file, (pct) => {
+      if (st) st.innerHTML = `<span style="font-size:12px;color:var(--primary)"><span class="spinner"></span> ${_nftL('ipfsUploading')}... ${pct}%</span>`;
+    });
+    _nftIpfsImageCid = res.cid;
+    const gw = escapeHtml(res.url);
+    const cidShort = escapeHtml(res.cid.slice(0, 12) + '...' + res.cid.slice(-6));
+    if (st) {
+      st.innerHTML = `
+        <div style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:10px 12px;font-size:12px;">
+          <div style="color:var(--success);font-weight:700;">${_nftL('ipfsImageOk')}</div>
+          <div style="margin-top:4px;word-break:break-all;color:var(--text-muted);">CID: <code style="color:var(--primary)">${cidShort}</code></div>
+          <a href="${gw}" target="_blank" rel="noopener" style="color:var(--primary);font-size:11px;">${_nftL('ipfsGateway')} →</a>
+        </div>`;
+    }
+  } catch (e) {
+    if (st) {
+      st.innerHTML = `<div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--danger);">${_nftL('ipfsUploadFail')}: ${escapeHtml(e.message)}</div>`;
+    }
+    _nftIpfsImageCid = '';
+  }
+}
+
+function _setIpfsStatus(type, msg) {
+  const st = document.getElementById('ipfsUploadStatus');
+  if (!st) return;
+  const colors = { warning: 'var(--warning)', error: 'var(--danger)', info: 'var(--primary)' };
+  st.innerHTML = `<div style="font-size:12px;color:${colors[type] || colors.info};">${escapeHtml(msg)}</div>`;
+}
+
+// 构造铸造用的 token_uri（IPFS 优先，否则降级 data URI / 手动 URI）
+async function _resolveMintTokenUri() {
+  const l = _nftL;
+  const useIpfs = document.getElementById('nftUseIpfs')?.checked;
+  const name = document.getElementById('nftName')?.value.trim() || 'NFT';
+  const desc = document.getElementById('nftDescription')?.value.trim() || '';
+  const manualUri = document.getElementById('nftImageUri')?.value.trim() || '';
+
+  if (useIpfs) {
+    const imgUri = _nftIpfsImageCid ? `ipfs://${_nftIpfsImageCid}` : (manualUri || '');
+    const meta = buildCw721Metadata(name, desc, imgUri, []);
+    try {
+      const { cid } = await uploadJsonToIpfs(meta, `metadata-${Date.now()}.json`);
+      return { tokenUri: `ipfs://${cid}`, meta, mode: 'ipfs' };
+    } catch (e) {
+      return { tokenUri: jsonToDataUri(meta), meta, mode: 'fallback', warn: l('ipfsFallback') + '：' + e.message };
+    }
+  } else {
+    // IPFS 关闭：图片以 base64 data URI 嵌入元数据（超过 100KB 警告）
+    const imgUri = manualUri || _nftCoverBase64 || '';
+    const meta = buildCw721Metadata(name, desc, imgUri, []);
+    if (_nftCoverBase64 && _nftCoverBase64.length > 100 * 1024) {
+      return { tokenUri: jsonToDataUri(meta), meta, mode: 'data', warn: l('ipfsLargeImg') };
+    }
+    return { tokenUri: jsonToDataUri(meta), meta, mode: 'data' };
+  }
 }
 
 // ========== DEPLOY ==========
@@ -557,11 +716,18 @@ async function _mintNft() {
   try {
     const addr = state.wallet.address;
     const timestamp = Date.now();
+
+    // 解析 token_uri（IPFS 上传元数据，或降级为 data URI）
+    btn.innerHTML = '<span class="spinner"></span> ' + _nftL('ipfsMetaGen');
+    const uriResult = await _resolveMintTokenUri();
+    const tokenUri = uriResult.tokenUri;
+    if (uriResult.warn) showToast(uriResult.warn, 'warning');
+
     const messages = [];
 
     for (let i = 0; i < count; i++) {
       const tokenId = `${timestamp}_${i}`;
-      const mintMsg = { mint: { token_id: tokenId, owner: addr, token_uri: `https://example.com/meta/${timestamp}_${i}.json` } };
+      const mintMsg = { mint: { token_id: tokenId, owner: addr, token_uri: tokenUri } };
       const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
         sender: addr,
         contract: contractAddr,
@@ -606,12 +772,14 @@ async function _mintNft() {
     }
 
     const l = _nftL;
+    const uriDisplay = tokenUri.length > 60 ? tokenUri.slice(0, 30) + '...' + tokenUri.slice(-24) : tokenUri;
     statusEl.className = 'status-msg success';
     statusEl.style.display = 'block';
     statusEl.innerHTML = `
       <strong>✅ ${l('mintSuccess')} ${count} ${l('nftMintCount')}</strong><br>
       <strong>${l('mintTokenIds')}:</strong><br>
       <code style="word-break:break-all;font-size:11px;">${Array.from({ length: count }, (_, i) => `${timestamp}_${i}`).join(', ')}</code><br>
+      <span style="font-size:11px">token_uri: <code style="word-break:break-all;font-size:11px">${escapeHtml(uriDisplay)}</code> ${uriResult.mode === 'ipfs' ? '<span style="color:var(--success)">IPFS</span>' : '<span style="color:var(--warning)">本地</span>'}</span><br>
       <span style="font-size:11px">Tx: <code style="font-size:11px">${escapeHtml(txHash)}</code></span>
       ${pollRes && pollRes.height ? `<br><span style="font-size:11px">${l('blockHeight')}: <code>${pollRes.height}</code></span>` : ''}
     `;

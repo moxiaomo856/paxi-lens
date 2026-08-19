@@ -262,8 +262,27 @@
 
     <!-- Step 2: Upload Assets -->
     <div id="panel-step2" style="display:none">
+      <div class="info-box">💡 上传的图片将自动存储到 IPFS，确保 NFT 永久可访问。</div>
       <div class="form-group">
-        <label class="form-label">NFT 封面图（仅用于本地预览，不存入链上）</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer;">
+          <input type="checkbox" id="useIpfs" checked style="width:18px;height:18px;accent-color:var(--primary);">
+          ✅ 使用 IPFS 存储（推荐）
+        </label>
+      </div>
+      <div id="ipfsConfigWrap" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;">⚙️ IPFS 配置（Pinata）</div>
+        <label class="form-label">Pinata JWT</label>
+        <div style="display:flex;gap:6px;">
+          <input type="password" id="pinataJwt" placeholder="粘贴你的 Pinata JWT..." style="flex:1;">
+          <button class="btn btn-primary btn-sm" onclick="savePinataJwt()">💾 保存</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-top:8px;">
+          <span id="ipfsConfigStatus"></span>
+          <a href="https://app.pinata.cloud/keys" target="_blank" rel="noopener" style="color:var(--primary);font-size:11px;">🔗 获取 Pinata JWT</a>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">NFT 封面图</label>
         <div class="upload-area" id="uploadCover" onclick="document.getElementById('fileCover').click()">
           <div style="font-size:32px;margin-bottom:8px">🖼️</div>
           <div>点击上传封面图</div>
@@ -271,9 +290,10 @@
           <img id="coverPreview" class="upload-preview">
         </div>
         <input type="file" id="fileCover" accept="image/*" style="display:none">
+        <div id="ipfsUploadStatus" style="margin-top:10px;"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">图片 IPFS/Arweave URI（可选，测试中可不填）</label>
+        <label class="form-label">图片 URI（关闭IPFS时使用，或覆盖IPFS图片）</label>
         <input type="text" id="nftImageUri" placeholder="https://...">
       </div>
       <div style="display:flex;gap:12px">
@@ -421,6 +441,8 @@ const CONFIG = {
 let walletState = { connected: false, address: '', publicKey: null };
 let currentStep = 1;
 let coverImageBase64 = null;
+let coverFile = null;
+let ipfsImageCid = '';
 let deployedList = JSON.parse(localStorage.getItem('paxi_nft_deployed') || '[]');
 
 async function connectWallet() {
@@ -497,13 +519,94 @@ document.getElementById('fileCover').addEventListener('change', handleCoverUploa
 function handleCoverUpload(e) {
   const file = e.target.files[0];
   if (file) {
+    coverFile = file;
     const reader = new FileReader();
-    reader.onload = (e) => {
-      coverImageBase64 = e.target.result;
+    reader.onload = (ev) => {
+      coverImageBase64 = ev.target.result;
       document.getElementById('coverPreview').src = coverImageBase64;
       document.getElementById('coverPreview').style.display = 'block';
     };
     reader.readAsDataURL(file);
+    maybeUploadCoverToIpfs(file);
+  }
+}
+
+// ============================================================
+// IPFS 上传 & 配置
+// ============================================================
+function savePinataJwt() {
+  const val = document.getElementById('pinataJwt').value;
+  setPinataJwt(val);
+  refreshIpfsConfigStatus();
+  showToast(hasPinataJwt() ? '✓ 已配置' : '⚠ 未配置', hasPinataJwt() ? 'success' : 'warning');
+  if (hasPinataJwt() && coverFile && !ipfsImageCid && document.getElementById('useIpfs').checked) {
+    maybeUploadCoverToIpfs(coverFile);
+  }
+}
+
+function refreshIpfsConfigStatus() {
+  const el = document.getElementById('ipfsConfigStatus');
+  if (el) el.textContent = hasPinataJwt() ? '✓ 已配置' : '⚠ 未配置';
+}
+
+async function maybeUploadCoverToIpfs(file) {
+  if (!document.getElementById('useIpfs').checked) return;
+  if (!hasPinataJwt()) {
+    setIpfsStatus('warning', '请先在 IPFS 配置中填入 Pinata JWT');
+    return;
+  }
+  const st = document.getElementById('ipfsUploadStatus');
+  try {
+    if (st) st.innerHTML = `<span style="font-size:12px;color:var(--primary)"><span class="spinner"></span> 上传中... 0%</span>`;
+    const res = await uploadFileToIpfs(file, (pct) => {
+      if (st) st.innerHTML = `<span style="font-size:12px;color:var(--primary)"><span class="spinner"></span> 上传中... ${pct}%</span>`;
+    });
+    ipfsImageCid = res.cid;
+    const cidShort = escapeHtml(res.cid.slice(0, 12) + '...' + res.cid.slice(-6));
+    if (st) {
+      st.innerHTML = `
+        <div style="background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:10px 12px;font-size:12px;">
+          <div style="color:var(--success);font-weight:700;">✅ 图片已上传到 IPFS</div>
+          <div style="margin-top:4px;word-break:break-all;color:var(--text-muted);">CID: <code style="color:var(--primary)">${cidShort}</code></div>
+          <a href="${escapeHtml(res.url)}" target="_blank" rel="noopener" style="color:var(--primary);font-size:11px;">网关链接 →</a>
+        </div>`;
+    }
+  } catch (e) {
+    if (st) st.innerHTML = `<div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--danger);">❌ IPFS 上传失败: ${escapeHtml(e.message)}</div>`;
+    ipfsImageCid = '';
+  }
+}
+
+function setIpfsStatus(type, msg) {
+  const st = document.getElementById('ipfsUploadStatus');
+  if (!st) return;
+  const colors = { warning: 'var(--warning)', error: 'var(--danger)', info: 'var(--primary)' };
+  st.innerHTML = `<div style="font-size:12px;color:${colors[type] || colors.info};">${escapeHtml(msg)}</div>`;
+}
+
+// 构造铸造用的 token_uri（IPFS 优先，否则降级 data URI）
+async function resolveMintTokenUri() {
+  const useIpfs = document.getElementById('useIpfs')?.checked;
+  const name = document.getElementById('nftName')?.value.trim() || 'NFT';
+  const desc = document.getElementById('nftDescription')?.value.trim() || '';
+  const manualUri = document.getElementById('nftImageUri')?.value.trim() || '';
+
+  if (useIpfs) {
+    const imgUri = ipfsImageCid ? `ipfs://${ipfsImageCid}` : (manualUri || '');
+    const meta = buildCw721Metadata(name, desc, imgUri, []);
+    try {
+      const { cid } = await uploadJsonToIpfs(meta, `metadata-${Date.now()}.json`);
+      return { tokenUri: `ipfs://${cid}`, meta, mode: 'ipfs' };
+    } catch (e) {
+      return { tokenUri: jsonToDataUri(meta), meta, mode: 'fallback', warn: 'IPFS 不可用，已降级为基础模式：' + e.message };
+    }
+  } else {
+    const imgUri = manualUri || coverImageBase64 || '';
+    const meta = buildCw721Metadata(name, desc, imgUri, []);
+    if (coverImageBase64 && coverImageBase64.length > 100 * 1024) {
+      return { tokenUri: jsonToDataUri(meta), meta, mode: 'data', warn: '图片超过 100KB，建议开启 IPFS 以降低 Gas 费' };
+    }
+    return { tokenUri: jsonToDataUri(meta), meta, mode: 'data' };
   }
 }
 
@@ -701,6 +804,12 @@ async function executeBatchMint() {
     const messages = [];
     const timestamp = Date.now();
 
+    // 解析 token_uri（IPFS 上传元数据，或降级为 data URI）
+    btn.innerHTML = '<span class="spinner"></span> 正在生成并上传元数据...';
+    const uriResult = await resolveMintTokenUri();
+    const tokenUri = uriResult.tokenUri;
+    if (uriResult.warn) showToast(uriResult.warn, 'warning');
+
     // 为每个 NFT 创建独立的 mint 消息
     for (let i = 0; i < count; i++) {
       const tokenId = `${timestamp}_${i}`;
@@ -708,7 +817,7 @@ async function executeBatchMint() {
         mint: {
           token_id: tokenId,
           owner: walletState.address,
-          token_uri: `https://example.com/meta/${timestamp}_${i}.json`
+          token_uri: tokenUri
         }
       };
 
@@ -760,12 +869,14 @@ async function executeBatchMint() {
 
     statusEl.className = 'status-msg success';
     statusEl.style.display = 'block';
+    const uriDisplay = tokenUri.length > 60 ? tokenUri.slice(0, 30) + '...' + tokenUri.slice(-24) : tokenUri;
     statusEl.innerHTML = `
       <strong>✅ 成功铸造 ${count} 个 NFT！</strong><br>
-      <strong>Token IDs:</strong> 
+      <strong>Token IDs:</strong>
       <code style="word-break:break-all;font-size:11px">
         ${Array.from({ length: count }, (_, i) => `${timestamp}_${i}`).join(', ')}
       </code><br>
+      <strong>token_uri:</strong> <code style="word-break:break-all;font-size:11px">${escapeHtml(uriDisplay)}</code> ${uriResult.mode === 'ipfs' ? '<span style="color:var(--success)">IPFS</span>' : '<span style="color:var(--warning)">本地</span>'}<br>
       <strong>TxHash:</strong> <code style="word-break:break-all;font-size:11px">${escapeHtml(txHash)}</code><br>
       <strong>区块高度:</strong> ${pollRes.height}
     `;
@@ -828,6 +939,7 @@ function showToast(msg, type = '') {
 
 // 初始化
 renderDeployedContracts();
+refreshIpfsConfigStatus();
 </script>
 </body>
 </html>
