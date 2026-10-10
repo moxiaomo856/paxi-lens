@@ -1,3 +1,7 @@
+// 防重复提交：记录上一次提交的「源→目标,数量」签名与结果，拦截完全相同的失败重发（避免重复扣手续费）
+let rdLastSig = '';
+let rdLastFailed = false;
+
 TOOL_REGISTRY['redelegate'] = { render: renderRedelegate, onMount: loadRedelegateData };
 
 function renderRedelegate() {
@@ -10,24 +14,19 @@ function renderRedelegate() {
         <span style="font-size:11px;color:var(--text-muted);">📊 手续费：统一 0.15%（千分之 1.5）</span>
       </div>
       <div class="form-group">
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <button class="btn btn-outline btn-sm" id="rdVerifyBtn" onclick="verifyNodes()" style="min-height:44px;">🔍 ${t('redelegate.verifyNodes')}</button>
-          <span id="rdVerifyStatus" style="font-size:12px;color:var(--text-muted);"></span>
-        </div>
-      </div>
-      <div class="form-group">
         <label class="form-label">${t('redelegate.from')} <span id="rdFromLoading" style="font-size:11px;color:var(--primary);"></span></label>
         <select id="rdFrom" onchange="updateRdPreview()" ${!state.connected ? 'disabled' : ''}>
           <option value="">${state.connected ? '⏳ 加载中...' : t('redelegate.selectFrom')}</option>
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">${t('redelegate.to')} <span id="rdToLoading" style="font-size:11px;color:var(--primary);">⏳ 加载中...</span></label>
+        <label class="form-label">${t('redelegate.to')} <span id="rdToLoading" style="font-size:11px;color:var(--primary);"></span></label>
         <select id="rdTo" onchange="updateRdPreview()">
-          <option value="">⏳ 加载中...</option>
+          <option value="">${t('redelegate.selectTo')}</option>
         </select>
-        <div style="display:flex;gap:8px;margin-top:6px;">
-          <button class="btn btn-outline btn-xs" id="rdRetryValidators" onclick="loadValidatorsOnly()" style="display:none;font-size:11px;padding:4px 8px;min-height:28px;">🔄 重试验证人列表</button>
+        <div style="display:flex;gap:8px;margin-top:6px;align-items:center;">
+          <button class="btn btn-outline btn-sm" id="rdLoadValidatorsBtn" onclick="loadValidatorsManually()" style="min-height:38px;">🔍 加载验证节点</button>
+          <span id="rdToStatus" style="font-size:11px;color:var(--text-muted);"></span>
         </div>
       </div>
       <div class="form-group">
@@ -71,43 +70,11 @@ async function withTimeout(promise, ms, name) {
 }
 
 async function loadRedelegateData() {
-  const fromSel = document.getElementById('rdFrom');
-  const fromLoading = document.getElementById('rdFromLoading');
-  const toLoading = document.getElementById('rdToLoading');
-  if (!fromSel) return;
-
-  // ====== 1) 验证人列表（目标节点）：公开链上数据，不依赖钱包，进入即加载 ======
-  // 与「验证节点对比」同源接口，点开即可用，无需先连钱包
-  try {
-    const cachedVal = localStorage.getItem('paxi_validators_cache');
-    if (cachedVal) {
-      const validators = (JSON.parse(cachedVal).data?.validators || []);
-      if (validators.length > 0) {
-        populateToSelect(validators);
-        if (toLoading) toLoading.textContent = '✅ 缓存已载入，刷新中...';
-      }
-    }
-  } catch (_) {}
-  loadValidatorsOnly();
-
-  // ====== 2) 当前委托（当前质押节点）：需要钱包地址 ======
-  if (!state.connected) {
-    if (fromLoading) { fromLoading.textContent = t('redelegate.needWallet'); fromLoading.style.color = 'var(--text-muted)'; }
-    if (fromSel) fromSel.innerHTML = `<option value="">${t('redelegate.selectFrom')}</option>`;
-    return;
-  }
-  // 立刻填充本地乐观缓存（如果有），0ms 响应
-  try {
-    const cachedDel = localStorage.getItem('paxi_my_delegations_cache');
-    if (cachedDel) {
-      const delegations = (JSON.parse(cachedDel).data?.delegation_responses || []);
-      if (delegations.length > 0) {
-        populateFromSelect(delegations, null, ' (本地缓存)');
-        if (fromLoading) fromLoading.textContent = '✅ 缓存已载入，刷新中...';
-      }
-    }
-  } catch (_) {}
-  loadDelegationsOnly(state.wallet.address);
+  // 验证人列表由用户点击"加载验证节点"按钮触发（不依赖钱包，避免未连接时卡在"加载中"）
+  // 当前质押节点（from）需要钱包授权，仅已连接时自动加载
+  if (!state.connected) return;
+  const address = state.wallet.address;
+  loadDelegationsOnly(address);
 }
 
 async function loadDelegationsOnly(address) {
@@ -147,88 +114,58 @@ async function loadDelegationsOnly(address) {
   }
 }
 
-async function verifyNodes() {
-  // 验证人列表属于公开链上数据，不依赖钱包连接，未连钱包也可加载
-  const btn = document.getElementById('rdVerifyBtn');
-  const status = document.getElementById('rdVerifyStatus');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> ' + t('redelegate.verifying'); }
-  if (status) { status.textContent = t('redelegate.verifying'); status.style.color = 'var(--text-muted)'; }
+async function loadValidatorsManually() {
+  const btn = document.getElementById('rdLoadValidatorsBtn');
+  const status = document.getElementById('rdToStatus');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> 加载中...'; }
+  if (status) { status.textContent = '⏳ 正在加载验证节点...'; status.style.color = 'var(--text-muted)'; }
   try {
-    await loadValidatorsOnly();
-    const toSel = document.getElementById('rdTo');
-    const count = toSel ? Math.max(0, toSel.options.length - 1) : 0;
-    if (count > 0) {
-      if (status) { status.textContent = '✅ ' + t('redelegate.verifyDone').replace('{count}', count); status.style.color = 'var(--success)'; }
-      showToast('✅ 验证人列表已加载，可直接选择目标节点', 'success');
-    } else {
-      if (status) { status.textContent = '⚠️ 未加载到节点，请重试'; status.style.color = 'var(--warning)'; }
-      showToast('⚠️ 暂未加载到节点，请重试', 'error');
-    }
-  } catch (e) {
-    if (status) { status.textContent = '❌ 验证失败：' + (e?.message || e); status.style.color = 'var(--danger)'; }
-    showToast('❌ 验证节点失败：' + (e?.message || e), 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = '🔍 ' + t('redelegate.verifyNodes'); }
-  }
-}
-
-async function loadValidatorsOnly() {
-  const toSel = document.getElementById('rdTo');
-  const toLoading = document.getElementById('rdToLoading');
-  const retryBtn = document.getElementById('rdRetryValidators');
-  try {
-    if (retryBtn) retryBtn.style.display = 'none';
-    // 与「验证节点对比」同源接口：/cosmos/staking/v1beta1/validators
-    // 先取「已绑定」节点（可直接作为迁移目标），失败/为空则回退到全量列表
-    let raw = [];
+    // 主接口：直接按「已绑定」过滤，一次返回全部活跃验证节点（避免 limit=100 截断漏掉）
+    // 实测主网：bonded 共 20 个、0 个被关押，未绑定节点远超 100 会被分页截断，故必须用 bonded 过滤
+    let all = [];
     try {
-      const valData = await withTimeout(
-        fetchAPIWithCache(
-          '/cosmos/staking/v1beta1/validators?pagination.limit=100&status=BOND_STATUS_BONDED',
-          'paxi_validators_cache',
-          60000
-        ),
-        10000,
-        '加载验证人列表'
+      const data = await withTimeout(
+        fetchAPI('/cosmos/staking/v1beta1/validators?pagination.limit=100&status=BOND_STATUS_BONDED'),
+        12000,
+        '加载验证节点'
       );
-      raw = valData.validators || [];
+      all = data.validators || [];
     } catch (_) {
-      raw = [];
+      all = [];
     }
-    if (raw.length === 0) {
+    // 兜底：若 bonded 过滤失败，退回全量列表再客户端过滤（仍可能因分页截断不全）
+    if (all.length === 0) {
       const fallback = await withTimeout(
         fetchAPI('/cosmos/staking/v1beta1/validators?pagination.limit=100'),
-        10000,
-        '加载验证人列表'
+        12000,
+        '加载验证节点'
       );
-      raw = fallback.validators || [];
+      all = fallback.validators || [];
     }
-    // 仅保留可作为迁移目标的节点：已绑定且未被关押
-    const usable = raw.filter(v => v.status === 'BOND_STATUS_BONDED' && !v.jailed);
-    const list = usable.length > 0 ? usable : raw;
-    populateToSelect(list);
-    // 验证人回来后，重新 populate from（补全 moniker，之前可能只有缓存的）
-    const valMap = {};
-    list.forEach(v => { valMap[v.operator_address] = v; });
+    const validators = all.filter(v => v.status === 'BOND_STATUS_BONDED' && !v.jailed);
+    populateToSelect(validators);
+    // 回填 from 的 moniker（若有本地委托缓存）
     try {
       const cachedDel = localStorage.getItem('paxi_my_delegations_cache');
       if (cachedDel) {
         const delegations = (JSON.parse(cachedDel).data?.delegation_responses || []);
         if (delegations.length > 0) {
+          const valMap = {};
+          validators.forEach(v => { valMap[v.operator_address] = v; });
           const currentFrom = document.getElementById('rdFrom')?.value;
           populateFromSelect(delegations, valMap, '');
           if (currentFrom) document.getElementById('rdFrom').value = currentFrom;
         }
       }
     } catch (_) {}
-    if (toLoading) toLoading.textContent = list.length > 0 ? '' : '⚠️ 未加载到节点';
+    if (status) { status.textContent = `✅ 已加载 ${validators.length} 个验证节点`; status.style.color = 'var(--success)'; }
+    showToast(`✅ 已加载 ${validators.length} 个验证节点`, 'success');
   } catch (e) {
-    console.error('[Redelegate] 验证人列表失败:', e);
-    if (toSel && toSel.options.length <= 1 && toSel.options[0]?.textContent?.includes('加载中')) {
-      toSel.innerHTML = `<option value="">❌ 加载失败：${e.message}</option>`;
-    }
-    if (toLoading) toLoading.innerHTML = `<span style="color:var(--danger);">❌ ${e.message}</span>`;
-    if (retryBtn) retryBtn.style.display = 'inline-flex';
+    console.error('[Redelegate] 验证节点加载失败:', e);
+    if (status) { status.textContent = '❌ 加载失败，请重试'; status.style.color = 'var(--danger)'; }
+    showToast('❌ 加载验证节点失败：' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '🔍 加载验证节点'; }
   }
 }
 
@@ -308,6 +245,15 @@ async function executeRedelegate() {
     showStatus('rdStatus', t('redelegate.invalidInput'), 'warning');
     return;
   }
+
+  // 防重复提交：同一笔（源→目标, 数量）已经失败过，则直接拦截，避免重复扣手续费
+  const rdSig = `${from}->${to}:${amount}`;
+  if (rdLastSig === rdSig && rdLastFailed) {
+    showStatus('rdStatus', '⚠️ 已提交过完全相同的交易且失败过，已自动拦截重复提交。此类错误（如"重新委托进行中"）重试无效，只会重复扣除手续费。请更换节点或数量后再试。', 'warning');
+    showToast('⚠️ 相同交易已失败过，已拦截重复提交', 'error');
+    return;
+  }
+
   let feeRate, fee;
   feeRate = 0.0015;
   fee = amount * feeRate;
@@ -347,13 +293,21 @@ async function executeRedelegate() {
     const broadcastRes = await buildSignAndBroadcast(messages, memo, null, state.wallet);
     const result = checkTxResult(broadcastRes);
     if (result.ok) {
+      rdLastSig = rdSig; rdLastFailed = false;
       showStatus('rdStatus', `${t('redelegate.success')} TxHash: ${result.txhash.slice(0,20)}...`, 'success');
       pollTxStatus(result.txhash);
       showToast(`✅ 迁移成功！手续费 ${fee.toFixed(4)} PAXI`, 'success');
     } else {
-      showStatus('rdStatus', `${t('redelegate.fail')} ${mapError(result.code, result.rawLog)}`, 'error');
+      rdLastSig = rdSig; rdLastFailed = true;
+      // 确定性业务错误（如 code 32 重新委托进行中）重试无效，给出醒目提示
+      const detail = mapError(result.code, result.rawLog);
+      const hint = (result.code === 32)
+        ? '（链上规则：同一路径的重新委托正在处理，需等待其完成后再操作；重复提交只会重复扣手续费，不会成功）'
+        : '';
+      showStatus('rdStatus', `${t('redelegate.fail')} ${detail}${hint}`, 'error');
     }
   } catch (e) {
+    rdLastSig = rdSig; rdLastFailed = true;
     showStatus('rdStatus', `${t('redelegate.fail')} ${e.message}`, 'error');
   } finally {
     btn.disabled = false;
