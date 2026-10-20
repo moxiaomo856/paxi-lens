@@ -1,92 +1,71 @@
-# Paxi 工具箱 + NFT 发射平台
+# Paxi 专业工具箱 · Pro Suite
 
-Paxi Network 生态工具集，纯前端部署，零服务器成本。
+Paxi Network 生态一体化工具集：**链上解码 + 发币 + 燃烧 + 资产管理 + 质押 + 治理**，纯前端部署，零服务器成本。
 
-## 项目结构
+> 由三个独立项目整合而成：paxi-toolbox（工具箱）、paxi-decoder（链上解码器）、paxi-pump（一键发币）、burn（代币燃烧器）。
+> 整合经两位领域专家（整合正确性 + 安全合规）平行审计，审计发现的问题已全部修复。
 
-```
-paxi-toolbox/
-├── index.html              # 工具箱主页（11个工具）
-├── app.js                  # 工具箱核心逻辑
-├── shared.js               # 公共模块（i18n / 状态 / 通用函数）
-├── compat.js               # SDK 兼容层（补充 PaxiCosmJS 缺失的类）
-├── nft-launcher/
-│   └── index.html          # PRC-721 NFT 发射平台
-├── DEPLOY.md               # 超详细部署教程
-└── README.md
-```
+## 功能总览
 
-## 工具箱功能
+| 功能 | 类型 | 说明 |
+|------|------|------|
+| 🔍 链上解码器 | 只读 | 交易故事翻译成人话、合约功能实测发现、沙盒、批量解码、失败诊断 |
+| 🚀 定制化发币 | 签名 | 模板化部署 PRC-20（25 PAXI）/ PRC-721（50 PAXI），发行后自动撤销铸币权限 |
+| 🔥 代币燃烧器 | 签名 | 调用 PRC-20 burn 方法永久销毁代币，无平台费 |
+| 📤 批量转账 | 签名 | PAXI/PRC-20/NFT 批量发送，CSV 导入，打包单签名 |
+| 💰 余额查询 | 只读 | 批量多地址余额 + PRC-20 持仓，导出 CSV |
+| 🎨 NFT 发射 | 签名 | 三步创建 NFT 合集（IPFS 元数据） |
+| 🖼️ 我的 NFT | 只读 | 查看地址持有的 NFT 全部信息 |
+| 🔄 地址转换 | 只读 | Bech32 跨链前缀转换 |
+| 🔄 质押迁移 | 签名 | 验证节点一键切换，无解绑等待 |
+| ⛽ Gas 计算器 | 只读 | 各类交易费用估算 |
+| 🏦 验证节点对比 | 只读 | APR / 佣金率 / 投票权重 |
+| 📦 治理提案 | 签名 | 文本 / 参数修改提案提交与撤销 |
 
-| 功能 | 说明 |
-|------|------|
-| 📤 批量转账 | PAXI/PRC-20/NFT 批量发送，CSV 导入，1.5% 手续费 |
-| 💰 余额查询 | 批量查询多地址余额，导出 CSV |
-| 🏪 NFT 市场 | 上架/浏览/购买/授权/导入（Authz 原子交换） |
-| 🔍 交易追踪 | 输入 TxHash 查询交易状态 |
-| 🎨 NFT 发射 | 独立页面，三步创建 NFT 合集 |
-| 🔄 地址转换 | Bech32 地址跨链前缀转换 |
-| 🔄 变更质押节点 | 质押从一个验证节点迁移到另一个 |
-| ⛽ Gas 计算器 | 估算不同类型交易费用 |
-| 🏦 验证节点对比 | 实时节点 APR、佣金率对比 |
-| 📊 P2P 买卖市场 | 发布 PAXI 买单/卖单，分享码传播 |
-| 📌 后期开发 | 占位提示 |
+**未整合**（合规考量，代码不入库）：NFT 市场（Authz 授权风险）、小游戏。
 
-## NFT 发射平台
-
-- 三步创建 NFT 合集（信息填写 → 上传素材 → 预览部署）
-- 支持自定义名称、符号、供应量、版税、Mint 价格
-- 图片上传（Base64 存储在链上元数据中）
-- 部署时收取 10 PAXI 平台服务费（一次性）
-- 批量铸造 NFT（5 PAXI/批 + 合约 Mint 价格）
-- 自定义元数据存储（2 PAXI/枚）
-- 部署记录本地保存
-
-## 手续费配置
-
-| 功能 | 费率 | 收款地址 |
-|------|------|----------|
-| 批量转账（PAXI/PRC-20） | 1.5%（以 PAXI 原生代币收取） | `paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd` |
-| 批量转账（NFT） | 0.5 PAXI/笔（固定费率） | `paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd` |
-| NFT 合约部署 | 10 PAXI/次（一次性） | `paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd` |
-| 批量铸造 NFT | 5 PAXI/批 | `paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd` |
-| 自定义元数据存储 | 2 PAXI/枚 | `paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd` |
-
-## 快速部署到 GitHub Pages
+## 运行
 
 ```bash
-# 1. 在 GitHub 创建新仓库（例如 paxi-toolbox）
-
-# 2. 克隆到本地
-git clone https://github.com/你的用户名/paxi-toolbox.git
-cd paxi-toolbox
-
-# 3. 复制项目文件到仓库目录
-# 把 index.html, app.js, nft-launcher/ 复制进去
-
-# 4. 提交并推送
-git add .
-git commit -m "Paxi 工具箱 v1.0"
-git push origin main
-
-# 5. 开启 GitHub Pages
-# 仓库 Settings → Pages → Source: main 分支 → Save
-# 等待 1-2 分钟，访问：
-# https://你的用户名.github.io/paxi-toolbox/
+cd paxi-suite
+python -m http.server 8080
+# 浏览器打开 http://127.0.0.1:8080（建议在 PaxiHub App 内置浏览器打开以连接钱包）
 ```
 
-## 技术栈
+- 支持主网/测试网切换（右上角）；解码器当前固定主网（测试网无合约生态）
+- 支持 `?tool=decoder&hash=<交易哈希>` URL 直达解码
 
-- 纯 HTML/CSS/JavaScript（无框架依赖）
-- PaxiCosmJS SDK（链上交互）
-- PaxiHub 钱包集成（签名交易）
-- Paxi LCD API（数据查询）
-- GitHub Pages（静态托管）
-- Authz 原子交换（NFT 市场成交机制）
+## 整合架构
 
-## 技术文档
+```
+index.html
+├── shared.js            # 公共层：网络配置 / 签名广播 / Gas 模拟 / 错误映射
+├── compat.js            # PaxiCosmJS 兼容层（消息编码器）
+├── decoder-core.js      # 解码器核心引擎 v2（事件解析 / 故事生成 / schema 探测）
+├── appjs/core.js        # 外壳：i18n / state / 钱包 / 首页
+├── appjs/tools/*.js     # 12 个工具模块（TOOL_REGISTRY 注册制，IIFE 闭包隔离）
+└── templates.json       # Pump 发币模板
+```
 
-- [Paxi Network 官网](https://paxinet.io)
-- [PaxiHub 开发文档](https://paxinet.io/paxi_docs/paxihub)
-- [Paxi 区块浏览器](https://explorer.paxinet.io)
-- [GitHub 仓库](https://github.com/paxi-web3/paxi)
+- 模块隔离：三个新移植模块全部 IIFE 闭包，无全局泄漏；`test/check-decls.js` 守卫 221 个顶层声明零冲突
+- 钱包联动：顶栏连接/断开钱包会实时通知 pump/burn 刷新状态
+- 网络联动：pump/burn 跟随右上角主/测试网切换
+
+## 安全审计结论（已修复）
+
+- ✅ pump/burn 签名前明确展示服务费金额与收款地址，用户可见资金去向
+- ✅ burn 金额换算走 BigInt（`parseFloatToRawUnits`），无浮点误差，截断方向向下（不会多烧）；确认框同时显示原始输入与换算结果
+- ✅ 链上数据渲染全部过 esc 转义（含单双引号）；CSV 导出带公式注入防护
+- ✅ 广播结果校验 txhash，节点异常不误报成功
+- ⚠️ 已知风险：`paxi-cosmjs.umd.js` 从官方域名加载（无 SRI），ImgBB API key 暴露在前端——均为原项目既有设计，建议后续本地化 SDK
+
+## 测试
+
+```bash
+node test/check-decls.js    # 全局声明冲突检查（0 冲突）
+# 解码器核心引擎测试见 ../paxi-decoder（同一份 decoder-core.js，181 项全通过）
+```
+
+## 免责声明
+
+本工具集仅供链上数据查询和钱包操作辅助使用，不提供任何代币兑换、交易撮合、定价指引或信息中介服务，不构成任何投资建议。用户的一切链上操作均为自主行为，请遵守所在国家或地区的法律法规。

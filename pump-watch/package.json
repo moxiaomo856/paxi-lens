@@ -1,0 +1,12 @@
+{
+  "name": "paxi-pump-watch",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Paxi Pump 发币云端监控（常驻 HTTP 服务，每 10 分钟扫链并推送微信）",
+  "scripts": {
+    "start": "node pump-watch-server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

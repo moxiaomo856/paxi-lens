@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Paxi 工具箱</title>
-  <meta name="description" content="Paxi Network 生态工具集">
+  <title>Paxi 专业工具箱 · Pro Suite</title>
+  <meta name="description" content="Paxi Network 专业化工具集：链上解码 · 发币 · 燃烧 · 转账 · 质押 · 治理">
   <meta name="theme-color" content="#0f172a">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236366f1'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='white'>P</text></svg>">
   <style>
@@ -169,6 +169,12 @@
     .tool-card:active { background: var(--bg-hover); transform: scale(0.97); }
     .tool-card .icon { font-size: 22px; line-height: 1.2; }
     .tool-card .name { font-size: 11px; font-weight: 600; line-height: 1.3; }
+    .home-search { position: relative; margin-bottom: 6px; }
+    .home-search input { width: 100%; padding: 12px 38px 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); font-size: 14px; box-sizing: border-box; }
+    .home-search-clear { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted); font-size: 14px; }
+    .home-cat { font-size: 13px; font-weight: 700; color: var(--text-muted); margin: 18px 4px 8px; letter-spacing: .5px; }
+    .home-cat-icon { margin-right: 6px; }
+    .home-empty { text-align: center; color: var(--text-muted); padding: 40px 0; font-size: 14px; }
 
     /* ========== 二级页面返回栏 ========== */
     .back-bar {
@@ -486,53 +492,6 @@
     }
     .nft-buy-detail { text-align: center; margin-bottom: 16px; }
 
-    /* ========== P2P 市场样式 ========== */
-    .p2p-item {
-      background: var(--bg);
-      border-radius: 8px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      border-left: 4px solid var(--border);
-      transition: all 0.15s;
-    }
-    .p2p-item.buy { border-left-color: var(--success); }
-    .p2p-item.sell { border-left-color: var(--warning); }
-    .p2p-item .p2p-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-    .p2p-item .p2p-type {
-      font-weight: 700;
-      font-size: 13px;
-    }
-    .p2p-item .p2p-type.buy { color: var(--success); }
-    .p2p-item .p2p-type.sell { color: var(--warning); }
-    .p2p-item .p2p-body {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      font-size: 13px;
-      margin: 4px 0;
-    }
-    .p2p-item .p2p-body .label { color: var(--text-muted); font-size: 11px; }
-    .p2p-item .p2p-contact {
-      font-size: 12px;
-      color: var(--primary);
-      word-break: break-all;
-    }
-    .p2p-item .p2p-time {
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-    .p2p-item .p2p-addr {
-      font-size: 10px;
-      color: var(--text-muted);
-      font-family: monospace;
-    }
 
     /* ========== Mobile ========== */
     @media (max-width: 767px) {
@@ -588,9 +547,9 @@
   <div class="header-left">
     <div class="logo">P</div>
     <div>
-      <div class="header-title" id="appTitle">paxi工具箱</div>
+      <div class="header-title" id="appTitle">Paxi 专业工具箱</div>
     </div>
-    <span class="header-badge">1.0</span>
+    <span class="header-badge">Pro 1.0</span>
   </div>
   <div class="header-right">
     <span class="wallet-balance" id="walletBalance" style="display:none"></span>
@@ -621,18 +580,25 @@
 <script src="appjs/tools/validator-compare.js"></script>
 <script src="appjs/tools/redelegate.js"></script>
 <!-- <script src="appjs/tools/nft-market.js"></script> -->
-<!-- <script src="appjs/tools/p2p-market.js"></script> -->
 <script src="appjs/tools/proposal.js"></script>
-<!-- 游戏模块（已注释）
-<script src="appjs/games/games.js"></script>
-<script src="appjs/games/game-payment.js"></script>
-<script src="appjs/games/plane-war.js"></script>
-<script src="appjs/games/game-2048.js"></script>
-<script src="appjs/games/klotski.js"></script>
-<script src="appjs/games/bubble-shooter.js"></script>
-<script src="appjs/games/tetris.js"></script>
-<script src="appjs/games/gomoku.js"></script>
+<!-- 新增工具模块（质押/治理/委托/地址簿/IBC/交易模拟） -->
+<script src="appjs/tools/claim-rewards.js"></script>
+<script src="appjs/tools/gov-vote.js"></script>
+<script src="appjs/tools/stake-manage.js"></script>
+<script src="appjs/tools/address-book.js"></script>
+<script src="appjs/tools/ibc-query.js"></script>
+<script src="appjs/tools/tx-dryrun.js"></script>
+<script src="appjs/tools/allowance.js"></script>
+<script src="appjs/tools/swap.js"></script>
+<!-- 游戏模块（合规移除，未整合）
 -->
+<!-- 链上解码器（核心引擎 + 界面模块） -->
+<script src="decoder-core.js"></script>
+<script src="appjs/tools/decoder.js"></script>
+<!-- 定制化发币 -->
+<script src="appjs/tools/pump.js"></script>
+<!-- 代币燃烧器 -->
+<script src="appjs/tools/burn.js"></script>
 <!-- NFT 发射内嵌版 -->
 <script src="appjs/tools/nft-launcher.js"></script>
 <!-- 我的 NFT 查看器 -->
@@ -646,8 +612,8 @@
   // 首页底部：整站统一免责声明（中英双语）
   (function () {
     try {
-      const disclaimerZH = '⚠️ 本网站（及所有子页面）仅供链上数据查询和钱包操作辅助使用。<br>不提供任何代币兑换、交易撮合、定价指引或信息中介服务。<br>用户的一切链上操作均为自主行为，与本网站无关。<br>请遵守您所在国家或地区的法律法规。';
-      const disclaimerEN = '⚠️ This website (and all subpages) is for on-chain data query and wallet assistance only.<br>No token exchange, trading, pricing, or intermediary services are provided.<br>All on-chain actions are your own responsibility.<br>Please comply with the laws of your jurisdiction.';
+      const disclaimerZH = '⚠️ 本网站（及所有子页面）仅供链上数据查询和钱包操作辅助使用。<br>不提供任何代币兑换、交易撮合、定价指引或信息中介服务。<br>用户的一切链上操作均为自主行为，与本网站无关。<br>所有信息不构成任何投资建议，代币价值波动风险由用户自行承担。<br>请遵守您所在国家或地区的法律法规。';
+      const disclaimerEN = '⚠️ This website (and all subpages) is for on-chain data query and wallet assistance only.<br>No token exchange, trading, pricing, or intermediary services are provided.<br>All on-chain actions are your own responsibility. No investment advice is provided; token price volatility risk is borne by the user.<br>Please comply with the laws of your jurisdiction.';
       function getLang() { return localStorage.getItem('paxi_lang') || 'zh'; }
       function render() {
         let el = document.getElementById('siteDisclaimer');

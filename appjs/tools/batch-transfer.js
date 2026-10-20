@@ -332,6 +332,18 @@ async function executeBatchTransfer() {
     : CONFIG.batchTransfer.feePerAddress;
   const totalFeePaxi = totalRecipients * feePerAddr;
 
+  const totalAmount = state.batchRecipients.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+  const tokenLabel = tokenType === 'native' ? 'PAXI' : tokenType === 'prc20' ? 'PRC-20' : 'NFT';
+  const okBatch = confirm(
+    `确认执行批量转账？\n\n` +
+    `收款地址数：${totalRecipients}（分 ${batches.length} 批）\n` +
+    `转账总额：${totalAmount} ${tokenLabel}\n` +
+    `服务费：${totalFeePaxi.toFixed(5)} PAXI（${feePerAddr} PAXI/地址，已包含）\n` +
+    `服务费收款地址：${CONFIG.feeCollector}\n\n` +
+    `点击「确定」后将在钱包中签名，请在钱包内核对以上信息。`
+  );
+  if (!okBatch) { btn.disabled = false; return; }
+
   statusEl.className = 'status-msg info';
   statusEl.style.display = 'block';
   statusEl.innerHTML = `<div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 准备发送（共 ${totalRecipients} 个地址，分 ${batches.length} 批）...</div>`;
@@ -364,7 +376,7 @@ async function executeBatchTransfer() {
       const batchFeeMicro = paxiToUpaxi(batchFeePaxi.toFixed(8));
 
       btn.innerHTML = `<span class="spinner"></span> 第 ${batchNum}/${batches.length} 批签名中...`;
-      statusEl.innerHTML = `<div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 正在发送第 ${batchNum}/${batches.length} 批（${batch.length} 个地址）</div><div style="font-size:13px;">💰 本批手续费：${batchFeePaxi.toFixed(5)} PAXI</div>`;
+      statusEl.innerHTML = `<div style="font-weight:600;font-size:14px;margin-bottom:8px;">⏳ 正在发送第 ${batchNum}/${batches.length} 批（${batch.length} 个地址）</div><div style="font-size:13px;">💰 本批服务费：${batchFeePaxi.toFixed(5)} PAXI</div>`;
 
       // 构建本批消息
       const allMessages = [];
@@ -386,7 +398,7 @@ async function executeBatchTransfer() {
           allMessages.push(PaxiCosmJS.Any.fromPartial({ typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract', value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish() }));
         }
       }
-      // 手续费消息（与原来完全一样的 MsgSend 到 feeCollector）
+      // 服务费消息（与原来完全一样的 MsgSend 到 feeCollector）
       if (batchFeeMicro !== '0') {
         const feeMsg = PaxiCosmJS.MsgSend.fromPartial({ fromAddress: sender.address, toAddress: CONFIG.feeCollector, amount: [PaxiCosmJS.coins(batchFeeMicro, denom)[0]] });
         allMessages.push(PaxiCosmJS.Any.fromPartial({ typeUrl: '/cosmos.bank.v1beta1.MsgSend', value: PaxiCosmJS.MsgSend.encode(feeMsg).finish() }));
@@ -470,7 +482,7 @@ async function executeBatchTransfer() {
       statusEl.className = 'status-msg success';
       statusEl.innerHTML = `
         <div style="font-weight:600;font-size:16px;margin-bottom:10px;color:var(--success)">✅ 全部完成！</div>
-        <div style="font-size:13px;line-height:1.8;">📤 转账：${successCount} 笔（${batches.length} 批）<br>💰 手续费：${totalFeePaxi.toFixed(5)} PAXI（已包含）<br>🔗 <a href="https://explorer.paxinet.io/tx/${txHashes[0]}" target="_blank" style="color:var(--primary)">查看首笔交易详情</a>${txHashes.length > 1 ? `（共 ${txHashes.length} 笔交易）` : ''}</div>
+        <div style="font-size:13px;line-height:1.8;">📤 转账：${successCount} 笔（${batches.length} 批）<br>💰 服务费：${totalFeePaxi.toFixed(5)} PAXI（已包含）<br>🔗 <a href="https://explorer.paxinet.io/tx/${txHashes[0]}" target="_blank" style="color:var(--primary)">查看首笔交易详情</a>${txHashes.length > 1 ? `（共 ${txHashes.length} 笔交易）` : ''}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:8px;background:rgba(99,102,241,0.1);padding:8px 12px;border-radius:6px;">💡 接收方如果钱包不显示记录，请在「余额查询」中点击「📜 转入记录」查看完整链上记录</div>
       `;
       txHashes.forEach(h => pollTxStatus(h));
@@ -479,7 +491,7 @@ async function executeBatchTransfer() {
       statusEl.className = 'status-msg warning';
       statusEl.innerHTML = `
         <div style="font-weight:600;font-size:16px;margin-bottom:10px;color:#ffd700;">⚠️ 部分完成</div>
-        <div style="font-size:13px;line-height:1.8;">✅ 成功：${successCount} 笔<br>❌ 失败：${failCount} 笔<br>💰 手续费：${(successCount * feePerAddr).toFixed(5)} PAXI（仅对成功交易收取）</div>
+        <div style="font-size:13px;line-height:1.8;">✅ 成功：${successCount} 笔<br>❌ 失败：${failCount} 笔<br>💰 服务费：${(successCount * feePerAddr).toFixed(5)} PAXI（仅对成功交易收取）</div>
       `;
     }
     refreshBalance();
@@ -487,7 +499,7 @@ async function executeBatchTransfer() {
   } catch (e) {
     console.error('Batch transfer error:', e);
     statusEl.className = 'status-msg error';
-    statusEl.innerHTML = `❌ 执行失败：${mapError(undefined, e.message)}${successCount > 0 ? `<br><br>✅ 已成功 ${successCount} 笔，手续费 ${(successCount * feePerAddr).toFixed(5)} PAXI` : ''}`;
+    statusEl.innerHTML = `❌ 执行失败：${mapError(undefined, e.message)}${successCount > 0 ? `<br><br>✅ 已成功 ${successCount} 笔，服务费 ${(successCount * feePerAddr).toFixed(5)} PAXI` : ''}`;
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🚀 执行批量转账';

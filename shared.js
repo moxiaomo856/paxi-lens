@@ -67,8 +67,8 @@ const SHARED_CONFIG = {
   feeRate: 1.5,
   // 批量转账按地址收费（PAXI/地址）
   batchTransfer: {
-    feePerAddress: 0.03838,     // 原生/PRC-20 每地址手续费
-    nftFeePerAddress: 1,        // NFT 每地址手续费
+    feePerAddress: 0.03838,     // 原生/PRC-20 每地址服务费
+    nftFeePerAddress: 1,        // NFT 每地址服务费
     maxAddressesPerTx: 100,     // 每笔交易最多地址数
     maxTotalAddresses: 1000,    // 总上限
   },

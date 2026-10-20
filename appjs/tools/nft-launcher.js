@@ -78,6 +78,7 @@ const _NFT_LANG = {
     warningEn: '⚠️ This tool only provides technical services for NFT minting. No trading, pricing, or exchange functions are offered. Users bear all consequences.',
     // Misc
     max10Hint: '单次最多铸造 10 个 NFT',
+    mintConfirm: '确认批量铸造？\n\n· 服务费：5 PAXI\n· 收款地址：',
     buildTx: '构建铸造交易...',
     // IPFS
     ipfsHint: '💡 上传的图片将自动存储到 IPFS，确保 NFT 永久可访问。',
@@ -162,6 +163,7 @@ const _NFT_LANG = {
     warning: '⚠️ This tool only provides technical services for NFT minting. No trading, pricing, or exchange functions are offered. Users bear all consequences.',
     warningEn: '⚠️ This tool only provides technical services for NFT minting. No trading, pricing, or exchange functions are offered. Users bear all consequences.',
     max10Hint: 'Max 10 NFTs per transaction',
+    mintConfirm: 'Confirm batch mint?\n\n· Service fee: 5 PAXI\n· Receiver: ',
     buildTx: 'Building mint tx...',
     // IPFS
     ipfsHint: '💡 Uploaded images are stored on IPFS, ensuring permanent NFT access.',
@@ -707,6 +709,7 @@ async function _mintNft() {
   const count = parseInt(document.getElementById('mintCount').value) || 0;
   if (!contractAddr || count < 1) { showToast(_nftL('fillAll'), 'warning'); return; }
   if (count > 10) { showToast(_nftL('max10Hint'), 'warning'); return; }
+  if (!confirm(_nftL('mintConfirm') + (CONFIG.feeCollector || 'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd'))) return;
 
   const btn = document.getElementById('btnBatchMint');
   const statusEl = document.getElementById('nftMintStatus');
@@ -744,7 +747,7 @@ async function _mintNft() {
     const feeAmount = paxiToUpaxi('5');
     const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
       fromAddress: addr,
-      toAddress: (CONFIG.feeCollector || 'paxi1d0d2n4p0p6h8v2y6t4k8x0c4w2e6q8m2f4h6j0'),
+      toAddress: (CONFIG.feeCollector || 'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd'),
       amount: [PaxiCosmJS.coins(feeAmount, CONFIG.denom)[0]],
     });
     messages.push(PaxiCosmJS.Any.fromPartial({

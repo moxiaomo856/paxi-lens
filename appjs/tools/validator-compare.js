@@ -17,10 +17,44 @@ function renderValidatorCompare() {
 async function loadValidatorData() {
   showStatus('vcStatus', t('validatorCompare.loading'), 'info');
   try {
-    const data = await fetchAPI('/cosmos/staking/v1beta1/validators?pagination.limit=100');
+    let validators = [];
+    let nextKey = null;
+    do {
+      const url = '/cosmos/staking/v1beta1/validators?pagination.limit=100' + (nextKey ? `&pagination.key=${encodeURIComponent(nextKey)}` : '');
+      const data = await fetchAPI(url);
+      validators = validators.concat(data.validators || []);
+      nextKey = (data.pagination && data.pagination.next_key) ? data.pagination.next_key : null;
+    } while (nextKey);
     const poolData = await fetchAPI('/cosmos/staking/v1beta1/pool');
     const bondedTokens = parseInt(poolData.pool?.bonded_tokens || '0') / 1e6;
-    const validators = data.validators || [];
+
+    /* ---- APR 计算：全部从链上实时读取，不硬编码 ----
+     * Paxi 通胀逐年减半（第 1 年 8% → 第 2 年 4% → …），
+     * 必须读 mint 模块的当前通胀率，否则第 2 年起 APR 会高估一倍。
+     * APR = 总供应量 × 通胀率 × (1 − 社区池税率) ÷ 总质押量            */
+    let inflation = null, totalSupply = 0, communityTax = 0.05, aprSource = '';
+    try {
+      const infData = await fetchAPI('/cosmos/mint/v1beta1/inflation');
+      inflation = parseFloat(infData.inflation);
+      aprSource = '链上实时';
+    } catch (_) {}
+    if (inflation === null || !isFinite(inflation)) {
+      inflation = 0.04;   // 兜底：按第 2 年 4% 估算
+      aprSource = '兜底值(第2年4%)';
+    }
+    try {
+      const supData = await fetchAPI('/cosmos/bank/v1beta1/supply/by_denom?denom=upaxi');
+      totalSupply = parseInt(supData.amount?.amount || '0') / 1e6;
+    } catch (_) {}
+    try {
+      const distData = await fetchAPI('/cosmos/distribution/v1beta1/params');
+      communityTax = parseFloat(distData.params?.community_tax ?? '0.05');
+    } catch (_) {}
+
+    const annualReward = totalSupply > 0 ? totalSupply * inflation * (1 - communityTax) : 0;
+    const bondedRatio = totalSupply > 0 ? (bondedTokens / totalSupply) * 100 : 0;
+    const estimatedAPR = (bondedTokens > 0 && annualReward > 0)
+      ? (annualReward / bondedTokens) * 100 : 0;
     const sorted = validators.map(v => ({
       moniker: v.description?.moniker || 'Unknown',
       address: v.operator_address,
@@ -28,16 +62,25 @@ async function loadValidatorData() {
       commission: parseFloat(v.commission?.commission_rates?.rate || '0') * 100,
       status: v.status === 'BOND_STATUS_BONDED' ? '✅ 活跃' : '⚠️ 待定',
       jailed: v.jailed,
-    })).sort((a,b) => b.votingPower - a.votingPower);
-    const annualInflation = 0.08;
-    const totalSupply = 72_000_000;
-    const annualReward = totalSupply * annualInflation * 0.95;
-    const estimatedAPR = bondedTokens > 0 ? (annualReward / bondedTokens) * 100 : 0;
+    }))    .sort((a,b) => b.votingPower - a.votingPower);
+    /* 口径说明：钱包 App 的「委托总量」是全部节点合计（含候选+解绑中），
+     * 只有 BONDED 活跃节点参与收益分配，APR 分母必须用活跃质押量 */
+    const allSum = validators.reduce((acc, v) => acc + BigInt(v.tokens || '0'), 0n);
+    /* BigInt→Number 前先降单位（upaxi→PAXI），防止总量增长后 Number 精度溢出 */
+    const allSumPaxi = Number(allSum / 1000000n);
+    const bondedCount = sorted.filter(v => v.status === '✅ 活跃').length;
     document.getElementById('vcResults').innerHTML = `
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-value">${sorted.length}</div><div class="stat-label">验证节点数</div></div>
-        <div class="stat-card"><div class="stat-value">${bondedTokens.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="stat-label">总质押量 (PAXI)</div></div>
-        <div class="stat-card"><div class="stat-value">${estimatedAPR.toFixed(1)}%</div><div class="stat-label">预估 APR</div></div>
+        <div class="stat-card"><div class="stat-value">${bondedCount}</div><div class="stat-label">活跃节点数</div></div>
+        <div class="stat-card"><div class="stat-value">${bondedTokens.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="stat-label">活跃质押量 (PAXI)</div></div>
+        <div class="stat-card"><div class="stat-value">${allSumPaxi.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="stat-label">全网委托合计 (PAXI)</div></div>
+        <div class="stat-card"><div class="stat-value">${(inflation * 100).toFixed(1)}%</div><div class="stat-label">当前通胀率（${aprSource}）</div></div>
+        <div class="stat-card"><div class="stat-value">${bondedRatio.toFixed(1)}%</div><div class="stat-label">活跃质押率</div></div>
+        <div class="stat-card"><div class="stat-value">${estimatedAPR > 0 ? estimatedAPR.toFixed(1) + '%' : '—'}</div><div class="stat-label">预估 APR</div></div>
+      </div>
+      <div class="hint" style="font-size:11px;color:var(--text-muted);margin:8px 0;">
+        📐 APR = 总供应 × 通胀 ${(inflation*100).toFixed(1)}% × (1−社区税 ${(communityTax*100).toFixed(0)}%) ÷ 活跃质押 —— Paxi 通胀逐年减半（第1年 8% → 第2年 4% → …），本数据自动跟随链上当前值。
+        ℹ️ 钱包 App 显示的「委托总量」（约 ${(allSumPaxi/1e6).toFixed(2)} 百万）是全部 ${validators.length} 个节点的合计，其中只有 ${bondedCount} 个活跃节点（${bondedTokens.toLocaleString(undefined,{maximumFractionDigits:0})} PAXI）参与收益分配；其余为候选节点与解除质押中的资金，不产生质押奖励。
       </div>
       <div class="table-wrap">
         <table>

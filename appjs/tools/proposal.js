@@ -3,7 +3,7 @@
  * 支持两类提案：
  *  - 文本提案 (TextProposal)
  *  - 参数修改提案 (ParameterChangeProposal) — 可添加多条 subspace/key/value
- * 手续费：SHARED_CONFIG.governance.submitFee（默认 50 PAXI）
+ * 服务费：SHARED_CONFIG.governance.submitFee（默认 50 PAXI）
  */
 if (!window.TOOL_REGISTRY) window.TOOL_REGISTRY = {};
 
@@ -64,7 +64,7 @@ function renderProposal() {
   return `
     <div class="card">
       <div class="card-title">${_t('proposal.title','治理提案')}</div>
-      <div class="tool-desc" style="margin-bottom:14px;">${_t('proposal.desc','提交 Paxi 网络治理提案，参与社区决策。提案需要支付押金，并支付平台手续费。')}</div>
+      <div class="tool-desc" style="margin-bottom:14px;">${_t('proposal.desc','提交 Paxi 网络治理提案，参与社区决策。提案需要支付押金，并支付平台服务费。')}</div>
 
       <div class="card" style="background:var(--bg);padding:16px;">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;font-weight:700;font-size:15px;">
@@ -78,7 +78,7 @@ function renderProposal() {
 
         <div class="form-group">
           <label class="form-label">${_t('proposal.titleLabel','提案标题')}</label>
-          <input type="text" id="proposalTitle" placeholder="${_t('proposal.titlePlaceholder','例如：建议降低交易手续费')}">
+          <input type="text" id="proposalTitle" placeholder="${_t('proposal.titlePlaceholder','例如：建议降低交易服务费')}">
         </div>
 
         <div class="form-group">
@@ -110,7 +110,7 @@ function renderProposal() {
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
-          <span style="font-size:13px;color:var(--text-muted);">${_t('proposal.fee','手续费 (PAXI)')}</span>
+          <span style="font-size:13px;color:var(--text-muted);">${_t('proposal.fee','服务费 (PAXI)')}</span>
           <span style="color:var(--primary);font-weight:700;font-size:15px;">${cfg.submitFee} PAXI</span>
         </div>
 
@@ -256,7 +256,7 @@ async function submitProposal() {
     changes = rows.map(r => ({ subspace: r.sub, key: r.key, value: r.val }));
   }
 
-  const confirmMsg = _t('proposal.confirmSubmit','确认支付 {fee} PAXI 手续费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。')
+  const confirmMsg = _t('proposal.confirmSubmit','确认支付 {fee} PAXI 服务费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。')
     .replace('{fee}', feeNum).replace('{deposit}', depositNum);
   if (!confirm(confirmMsg)) return;
 
@@ -297,7 +297,7 @@ async function submitProposal() {
       }),
     ];
 
-    // 平台手续费
+    // 平台服务费
     if (feeNum > 0) {
       const feeMicro = paxiToUpaxi(feeNum.toFixed(6));
       const feeCollector = (typeof SHARED_CONFIG !== 'undefined' && SHARED_CONFIG.feeCollector) || CONFIG.feeCollector;

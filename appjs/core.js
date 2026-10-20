@@ -7,11 +7,14 @@
 // ============================================================
 const LANG = {
   zh: {
-    appTitle: 'paxi工具箱',
+    appTitle: 'Paxi 专业工具箱',
     back: '← 返回工具箱',
     tools: {
+      decoder: '链上解码器',
       batchTransfer: '批量转账',
       balanceCheck: '地址余额 / 批量查询',
+      pump: '定制化发币',
+      burn: '代币燃烧器',
       nftMarket: 'NFT市场',
       txTracker: '交易追踪',
       nftLauncher: 'NFT发射',
@@ -20,16 +23,28 @@ const LANG = {
       redelegate: '变更质押节点',
       gasCalc: 'gas计算',
       validatorCompare: '验证节点',
-      p2pMarket: '买卖发布',
       proposal: '治理提案',
       games: '游戏娱乐',
       monitor: '链上监测',
-      later: '后期开发……'
+      later: '后期开发……',
+      claimRewards: '领取奖励',
+      govVote: '治理投票',
+      stakeManage: '委托/解委托',
+      addressBook: '地址簿',
+      ibcQuery: 'IBC 查询',
+      txDryRun: '交易模拟',
+      swap: 'Swap 辅助器',
+      allowance: '授权管理',
+      catStake: '质押与治理',
+      catAssets: '资产查询',
+      catTrade: '交易与发币',
+      catTools: '解码与工具',
+      searchPlaceholder: '搜索工具...'
     },
     batchTransfer: {
       title: '📤 批量转账',
       desc: '支持 PAXI 原生代币、PRC-20 代币、NFT 的批量发送。支持 CSV 导入和均额模式。',
-      modePack: '⚡ 打包发送模式：所有转账和手续费打包在 1 笔交易中，只需 1 次签名，手续费 100% 成功。',
+      modePack: '⚡ 打包发送模式：所有转账和服务费打包在 1 笔交易中，只需 1 次签名，服务费 100% 成功。',
       note: '💡 接收方如果钱包不显示记录，请在「余额查询」中点击「📜 转入记录」查看完整链上记录。',
       native: 'PAXI 原生代币',
       prc20: 'PRC-20 代币',
@@ -103,13 +118,13 @@ const LANG = {
     },
     redelegate: {
       title: '🔄 质押迁移',
-      desc: '一键切换验证节点，无需等待 7 天解绑期。手续费统一 0.15%（千分之 1.5）。',
+      desc: '一键切换验证节点，无需等待 7 天解绑期。服务费统一 0.15%（千分之 1.5）。',
       hint: '选择你当前质押的节点，再选择目标节点，输入数量即可完成迁移。',
       from: '从（当前质押节点）',
       to: '到（目标节点）',
       amount: '数量（PAXI）',
       max: '全部',
-      fee: '手续费',
+      fee: '服务费',
       feeRate: '费率',
       execute: '🚀 立即迁移',
       selectFrom: '请选择...',
@@ -119,34 +134,9 @@ const LANG = {
       invalidInput: '请完整选择节点和数量',
       noDelegations: '暂无质押记录'
     },
-    p2pMarket: {
-      title: '📊 Paxi 买卖市场',
-      desc: '发布买入/卖出 PAXI 的广告，自由交易。发布每条广告收取 1 PAXI 手续费。',
-      fee: '1 PAXI / 条（防刷屏）',
-      buy: '📈 发布买单',
-      sell: '📉 发布卖单',
-      buyLabel: '买单',
-      sellLabel: '卖单',
-      amount: '数量 (PAXI)',
-      price: '单价 (USDT)',
-      contact: '联系方式（TG / 微信 / 其他）',
-      note: '备注（可选）',
-      publish: '🚀 发布',
-      publishing: '发布中...',
-      success: '✅ 发布成功！',
-      fail: '❌ 发布失败：',
-      noData: '暂无买卖信息，快来发布第一条吧！',
-      from: '发布者',
-      time: '发布时间',
-      connectFirst: '请先连接钱包',
-      feeNote: '发布将收取 1 PAXI 手续费',
-      confirmPublish: '确认支付 1 PAXI 发布此广告？',
-      deleteConfirm: '确定删除这条广告吗？',
-      deleted: '已删除'
-    },
     proposal: {
       title: '📦 治理提案',
-      desc: '提交 Paxi 网络治理提案，参与社区决策。提案需要支付押金，并支付平台手续费。',
+      desc: '提交 Paxi 网络治理提案，参与社区决策。提案需要支付押金，并支付平台服务费。',
       submit: '📝 提交提案',
       type: '提案类型',
       typeText: '文本提案',
@@ -163,11 +153,11 @@ const LANG = {
       invalidParamRef: '参数修改提案至少添加一条参数',
       paramBlockTitle: '🔧 参数修改配置 (ParameterChangeProposal)',
       titleLabel: '提案标题',
-      titlePlaceholder: '例如：建议降低交易手续费',
+      titlePlaceholder: '例如：建议降低交易服务费',
       descLabel: '提案描述',
       descPlaceholder: '详细描述你的提案...',
       deposit: '押金 (PAXI)',
-      fee: '手续费 (PAXI)',
+      fee: '服务费 (PAXI)',
       submitBtn: '🚀 提交提案',
       submitting: '提交中...',
       success: '✅ 提案提交成功！提案 ID：',
@@ -185,7 +175,7 @@ const LANG = {
       connectFirst: '请先连接钱包',
       emptyFields: '请填写提案标题和描述',
       invalidDeposit: '押金必须大于 0',
-      confirmSubmit: '确认支付 {fee} PAXI 手续费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。',
+      confirmSubmit: '确认支付 {fee} PAXI 服务费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。',
       cancel: '撤销',
       cancelBtn: '🗑 撤销提案',
       cancelConfirm: '确认撤销提案 #{id}？撤销后押金将退还给您。',
@@ -333,11 +323,14 @@ const LANG = {
     }
   },
   en: {
-    appTitle: 'Paxi Toolbox',
+    appTitle: 'Paxi Pro Suite',
     back: '← Back',
     tools: {
+      decoder: 'On-chain Decoder',
       batchTransfer: 'Batch Transfer',
       balanceCheck: 'Balance / Batch Query',
+      pump: 'Custom Issuance',
+      burn: 'Token Burner',
       nftMarket: 'NFT Market',
       txTracker: 'Tx Tracker',
       nftLauncher: 'NFT Launcher',
@@ -346,11 +339,23 @@ const LANG = {
       redelegate: 'Redelegate',
       gasCalc: 'Gas Calc',
       validatorCompare: 'Validators',
-      p2pMarket: 'P2P Market',
       proposal: 'Gov Proposal',
       games: 'Game Center',
       monitor: 'Chain Monitor',
-      later: 'Coming Soon…'
+      later: 'Coming Soon…',
+      claimRewards: 'Claim Rewards',
+      govVote: 'Governance Vote',
+      stakeManage: 'Delegate/Undelegate',
+      addressBook: 'Address Book',
+      ibcQuery: 'IBC Query',
+      txDryRun: 'Tx Dry-run',
+      swap: 'Swap Helper',
+      allowance: 'Allowances',
+      catStake: 'Staking & Governance',
+      catAssets: 'Assets & Query',
+      catTrade: 'Trade & Issuance',
+      catTools: 'Decoder & Tools',
+      searchPlaceholder: 'Search tools...'
     },
     batchTransfer: {
       title: '📤 Batch Transfer',
@@ -429,13 +434,13 @@ const LANG = {
     },
     redelegate: {
       title: '🔄 Redelegate',
-      desc: 'Switch validator instantly, no 7-day unbonding. Flat fee: 0.15% (1.5‰).',
+      desc: 'Switch validator instantly, no 7-day unbonding. Service fee: 0.15% (1.5‰).',
       hint: 'Select your current validator, then target validator, enter amount to migrate.',
       from: 'From (current validator)',
       to: 'To (target validator)',
       amount: 'Amount (PAXI)',
       max: 'Max',
-      fee: 'Fee',
+      fee: 'Service Fee',
       feeRate: 'Rate',
       execute: '🚀 Redelegate Now',
       selectFrom: 'Select...',
@@ -445,34 +450,9 @@ const LANG = {
       invalidInput: 'Please select both validators and amount',
       noDelegations: 'No delegations found'
     },
-    p2pMarket: {
-      title: '📊 Paxi P2P Market',
-      desc: 'Post buy/sell PAXI ads, free trading. 1 PAXI fee per ad.',
-      fee: '1 PAXI / ad (anti-spam)',
-      buy: '📈 Post Buy',
-      sell: '📉 Post Sell',
-      buyLabel: 'Buy',
-      sellLabel: 'Sell',
-      amount: 'Amount (PAXI)',
-      price: 'Price (USDT)',
-      contact: 'Contact (TG/WeChat/Other)',
-      note: 'Note (optional)',
-      publish: '🚀 Publish',
-      publishing: 'Publishing...',
-      success: '✅ Published!',
-      fail: '❌ Failed: ',
-      noData: 'No ads yet, be the first!',
-      from: 'From',
-      time: 'Time',
-      connectFirst: 'Please connect wallet first',
-      feeNote: '1 PAXI fee will be charged',
-      confirmPublish: 'Confirm to pay 1 PAXI to publish this ad?',
-      deleteConfirm: 'Delete this ad?',
-      deleted: 'Deleted'
-    },
     proposal: {
       title: '📦 Governance Proposal',
-      desc: 'Submit Paxi Network governance proposals. Deposit required, plus platform fee.',
+      desc: 'Submit Paxi Network governance proposals. Deposit required, plus service fee.',
       submit: '📝 Submit Proposal',
       type: 'Proposal Type',
       typeText: 'Text Proposal',
@@ -511,7 +491,7 @@ const LANG = {
       connectFirst: 'Please connect wallet first',
       emptyFields: 'Please fill in title and description',
       invalidDeposit: 'Deposit must be greater than 0',
-      confirmSubmit: 'Confirm to pay {fee} PAXI platform fee + {deposit} PAXI deposit? Deposit will be refunded if proposal passes.',
+      confirmSubmit: 'Confirm to pay {fee} PAXI service fee + {deposit} PAXI deposit? Deposit will be refunded if proposal passes.',
       cancel: 'Cancel',
       cancelBtn: '🗑 Cancel Proposal',
       cancelConfirm: 'Cancel proposal #{id}? Deposit will be refunded.',
@@ -738,12 +718,64 @@ const state = {
 };
 
 // ============================================================
-// 初始化
+// 初始化（实际入口在 app.js 的 initApp —— 此处不再重复声明）
 // ============================================================
-function initApp() {
-  updateHeaderUI();
-  renderHome();
-  checkWalletInjection();
+
+/* ------------------------------------------------ 深链拉起（官方 DApp指南 §2）
+ * 官方模式：移动端未注入 → paxi://hub/explorer?url=<当前页>；约 1s 未进 App 再跳安装页。
+ * 本实现改为用户主动点击（避免自动跳转劫持），桌面端提供二维码。 */
+function showDeepLinkPrompt(force) {
+  if (typeof window.paxihub !== 'undefined') return;
+  if (!force && sessionStorage.getItem('paxi_deeplink_dismissed')) return;
+  if (document.getElementById('paxiDeeplinkBar')) return;
+  const zh = currentLang !== 'en';
+  const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+  const target = 'paxi://hub/explorer?url=' + encodeURIComponent(location.href);
+  const DOCS = 'https://paxinet.io/paxi_docs/paxihub#paxihub-application';
+  const btnCss = 'padding:9px 14px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block';
+  const bar = document.createElement('div');
+  bar.id = 'paxiDeeplinkBar';
+  bar.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-radius:12px;background:var(--bg-card,#151b26);border:1px solid var(--primary);box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:13px;color:var(--text,#e5e7eb)';
+  bar.innerHTML = (isMobile
+    ? `<span style="flex:1;min-width:180px">${zh ? '🔍 检测到钱包未连接，可在 PaxiHub App 中打开本页面' : 'Wallet not detected — open this page inside the PaxiHub app'}</span>
+       <button id="dlOpen" style="${btnCss}background:var(--primary,#6366f1);color:#fff;border:none">🚀 ${zh ? '在 PaxiHub 中打开' : 'Open in PaxiHub'}</button>`
+    : `<span style="flex:1;min-width:180px">${zh ? '💻 桌面浏览器未注入钱包：用手机 PaxiHub App 扫码打开，或安装钱包' : 'No wallet injected on desktop: scan with the PaxiHub mobile app, or install it'}</span>
+       <button id="dlQr" style="${btnCss}background:transparent;color:inherit;border:1px solid var(--border,#334155)">📱 ${zh ? '显示扫码' : 'Show QR'}</button>`)
+    + `<a href="${DOCS}" target="_blank" rel="noopener" style="${btnCss}background:transparent;color:inherit;border:1px solid var(--border,#334155)">⬇️ ${zh ? '安装钱包' : 'Install wallet'}</a>
+       <button id="dlClose" style="${btnCss}background:transparent;color:var(--text-muted,#94a3b8);border:none">✕</button>`;
+  document.body.appendChild(bar);
+  bar.querySelector('#dlClose').addEventListener('click', () => {
+    sessionStorage.setItem('paxi_deeplink_dismissed', '1');
+    bar.remove();
+  });
+  /* 移动端：点击深链 → 1.2s 内页面未被 App 接管（仍可见）才兜底跳安装页 */
+  const open = bar.querySelector('#dlOpen');
+  if (open) open.addEventListener('click', () => {
+    location.href = target;
+    const t = setTimeout(() => { if (!document.hidden) location.href = DOCS; }, 1200);
+    document.addEventListener('visibilitychange', function h() {
+      if (document.hidden) { clearTimeout(t); document.removeEventListener('visibilitychange', h); }
+    });
+  }, { once: true });
+  /* 桌面端二维码：懒加载 qrcodejs，失败降级为明文链接 */
+  const qrBtn = bar.querySelector('#dlQr');
+  if (qrBtn) qrBtn.addEventListener('click', () => {
+    let panel = document.getElementById('paxiDeeplinkQr');
+    if (panel) { panel.remove(); return; }
+    panel = document.createElement('div');
+    panel.id = 'paxiDeeplinkQr';
+    panel.style.cssText = 'position:fixed;right:16px;bottom:70px;z-index:9999;background:#fff;padding:14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.4);text-align:center;font-size:12px;color:#111;max-width:220px';
+    panel.innerHTML = '<div id="qrBox" style="width:180px;height:180px;display:flex;align-items:center;justify-content:center;word-break:break-all;font-size:10px">…</div><div style="margin-top:6px">' + (zh ? '用 PaxiHub App 扫码打开' : 'Scan with the PaxiHub app') + '</div>';
+    document.body.appendChild(panel);
+    const box = panel.querySelector('#qrBox');
+    const draw = () => { try { new QRCode(box, { text: target, width: 180, height: 180 }); } catch (_) { box.textContent = target; } };
+    if (typeof QRCode !== 'undefined') { draw(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+    s.onload = draw;
+    s.onerror = () => { box.textContent = target; };
+    document.head.appendChild(s);
+  });
 }
 
 function checkWalletInjection() {
@@ -756,6 +788,8 @@ function checkWalletInjection() {
       clearInterval(interval);
     } else if (attempts >= maxAttempts) {
       clearInterval(interval);
+      /* 注入超时：展示官方深链入口（移动端在 App 中打开 / 桌面端扫码） */
+      showDeepLinkPrompt(false);
     }
   }, 500);
 }
@@ -815,61 +849,123 @@ function navigateBack() {
 // ============================================================
 function renderHome() {
   const main = document.getElementById('mainContent');
-  const tools = [
-    { id: 'batch-transfer', icon: '📤', label: 'tools.batchTransfer' },
-    { id: 'balance-check', icon: '💰', label: 'tools.balanceCheck' },
-    // { id: 'nft-market', icon: '🏪', label: 'tools.nftMarket' }, // 合规移除：NFT市场
-    { id: 'tx-tracker', icon: '🔍', label: 'tools.txTracker' },
-    { id: 'nft-launcher', icon: '🎨', label: 'tools.nftLauncher' },
-    { id: 'my-nfts', icon: '🖼️', label: 'tools.myNfts' },
-    { id: 'address-convert', icon: '🔄', label: 'tools.addressConvert' },
-    { id: 'redelegate', icon: '🔄', label: 'tools.redelegate' },
-    { id: 'gas-calc', icon: '⛽', label: 'tools.gasCalc' },
-    { id: 'validator-compare', icon: '🏦', label: 'tools.validatorCompare' },
-    // { id: 'p2p-market', icon: '📊', label: 'tools.p2pMarket' }, // 合规移除：P2P买卖市场
-    { id: 'proposal', icon: '📦', label: 'tools.proposal' },
-    // { id: 'games', icon: '🎮', label: 'tools.games' }, // 已注释：游戏娱乐
-    // { id: 'monitor', icon: '📡', label: 'tools.monitor' }, // 已注释：链上监测
-    { id: 'later', icon: '📌', label: 'tools.later' },
-  ];
 
-  main.innerHTML = `
-    <div class="home-grid">
-      ${tools.map(item => `
+  // 工具清单（按分类组织；新增工具在此登记即可出现在首页）
+  const HOME_TOOLS = [
+    // 质押与治理
+    { id: 'claim-rewards', icon: '🎁', label: 'tools.claimRewards', cat: 'catStake' },
+    { id: 'stake-manage', icon: '🥩', label: 'tools.stakeManage', cat: 'catStake' },
+    { id: 'gov-vote', icon: '🗳️', label: 'tools.govVote', cat: 'catStake' },
+    { id: 'redelegate', icon: '🔄', label: 'tools.redelegate', cat: 'catStake' },
+    { id: 'validator-compare', icon: '🏦', label: 'tools.validatorCompare', cat: 'catStake' },
+    { id: 'proposal', icon: '📦', label: 'tools.proposal', cat: 'catStake' },
+    // 资产查询
+    { id: 'balance-check', icon: '💰', label: 'tools.balanceCheck', cat: 'catAssets' },
+    { id: 'my-nfts', icon: '🖼️', label: 'tools.myNfts', cat: 'catAssets' },
+    { id: 'address-book', icon: '📒', label: 'tools.addressBook', cat: 'catAssets' },
+    { id: 'allowance', icon: '🔑', label: 'tools.allowance', cat: 'catAssets' },
+    { id: 'ibc-query', icon: '🔗', label: 'tools.ibcQuery', cat: 'catAssets' },
+    // 交易与发币
+    { id: 'batch-transfer', icon: '📤', label: 'tools.batchTransfer', cat: 'catTrade' },
+    { id: 'pump', icon: '🚀', label: 'tools.pump', cat: 'catTrade' },
+    { id: 'burn', icon: '🔥', label: 'tools.burn', cat: 'catTrade' },
+    { id: 'nft-launcher', icon: '🎨', label: 'tools.nftLauncher', cat: 'catTrade' },
+    { id: 'swap', icon: '🔁', label: 'tools.swap', cat: 'catTrade' },
+    // 解码与工具
+    { id: 'decoder', icon: '🔍', label: 'tools.decoder', cat: 'catTools' },
+    { id: 'tx-dryrun', icon: '🧪', label: 'tools.txDryRun', cat: 'catTools' },
+    { id: 'gas-calc', icon: '⛽', label: 'tools.gasCalc', cat: 'catTools' },
+    { id: 'address-convert', icon: '🔄', label: 'tools.addressConvert', cat: 'catTools' },
+  ];
+  const CATS = ['catStake', 'catAssets', 'catTrade', 'catTools'];
+  const CAT_ICON = { catStake: '🗳️', catAssets: '💰', catTrade: '💱', catTools: '🧰' };
+
+  // 搜索可匹配：中文名 + 英文名 + tool id（跨语言也能搜中）
+  function toolSearchText(item) {
+    const key = item.label.split('.')[1];
+    const zh = (LANG.zh.tools && LANG.zh.tools[key]) || '';
+    const en = (LANG.en.tools && LANG.en.tools[key]) || '';
+    return (zh + ' ' + en + ' ' + item.id + ' ' + item.label).toLowerCase();
+  }
+
+  // 仅重绘工具列表区域（搜索框保持不变）
+  function renderList(q) {
+    const query = (q || '').trim().toLowerCase();
+    const listEl = document.getElementById('homeToolList');
+    if (!listEl) return;
+    let html = '';
+    let anyMatch = false;
+    for (const cat of CATS) {
+      const items = HOME_TOOLS.filter(it => it.cat === cat && (!query || toolSearchText(it).includes(query)));
+      if (items.length === 0) continue;
+      anyMatch = true;
+      html += `<div class="home-cat"><span class="home-cat-icon">${CAT_ICON[cat] || ''}</span>${t('tools.' + cat)}</div>`;
+      html += '<div class="home-grid">';
+      html += items.map(item => `
         <div class="tool-card" data-tool="${item.id}">
           <div class="icon">${item.icon}</div>
           <div class="name">${t(item.label)}</div>
-        </div>
-      `).join('')}
+        </div>`).join('');
+      html += '</div>';
+    }
+    if (!anyMatch) {
+      html = `<div class="home-empty">${currentLang === 'zh' ? '未找到匹配的工具' : 'No matching tools'}</div>`;
+    }
+    listEl.innerHTML = html;
+    listEl.querySelectorAll('.tool-card[data-tool]').forEach(card => {
+      card.addEventListener('click', () => navigateToTool(card.dataset.tool));
+    });
+  }
+
+  main.innerHTML = `
+    <div class="home-search">
+      <input id="homeSearchInput" type="text" placeholder="${t('tools.searchPlaceholder')}" />
+      <span id="homeSearchClear" class="home-search-clear" title="清除" style="display:none">✕</span>
     </div>
+    <div id="homeToolList"></div>
   `;
 
-  main.querySelectorAll('.tool-card[data-tool]').forEach(card => {
-    card.addEventListener('click', () => {
-      const toolId = card.dataset.tool;
-      if (toolId === 'later') {
-        showToast(t('tools.later'), 'info');
-      // } else if (toolId === 'monitor') {
-      //   // 链上监测：跳转到独立页面
-      //   window.location.href = 'monitor/index.html';
-      } else {
-        navigateToTool(toolId);
-      }
+  const input = document.getElementById('homeSearchInput');
+  if (input) {
+    input.value = window.__homeSearch || '';
+    input.addEventListener('input', (e) => {
+      window.__homeSearch = e.target.value;
+      renderList(e.target.value);
+      const clearBtn = document.getElementById('homeSearchClear');
+      if (clearBtn) clearBtn.style.display = e.target.value ? '' : 'none';
     });
-  });
+  }
+  const clearBtn = document.getElementById('homeSearchClear');
+  if (clearBtn) {
+    clearBtn.style.display = window.__homeSearch ? '' : 'none';
+    clearBtn.addEventListener('click', () => {
+      window.__homeSearch = '';
+      if (input) input.value = '';
+      clearBtn.style.display = 'none';
+      renderList('');
+      if (input) input.focus();
+    });
+  }
+
+  renderList(window.__homeSearch || '');
 }
 
 // ============================================================
 // 钱包连接
 // ============================================================
+/** 通知当前工具钱包状态变化（pump/burn 等签名工具依赖此刷新内部钱包状态） */
+function notifyCurrentToolWalletChange() {
+  const reg = window.TOOL_REGISTRY && window.TOOL_REGISTRY[state.currentTool];
+  if (reg && typeof reg.onMount === 'function') {
+    try { reg.onMount(); } catch (_) {}
+  }
+}
+
 async function connectWallet() {
   if (typeof window.paxihub === 'undefined') {
-    showToast('请先安装 PaxiHub 钱包', 'error');
-    if (/Mobi/.test(navigator.userAgent)) {
-      setTimeout(() => {
-        window.location.href = 'https://paxinet.io/paxi_docs/paxihub#paxihub-application';
-      }, 1500);
-    }
+    showToast(currentLang === 'en' ? 'PaxiHub wallet not detected' : '未检测到 PaxiHub 钱包', 'error');
+    /* 官方深链入口：移动端在 App 中打开 / 桌面端扫码（不再自动跳转劫持） */
+    showDeepLinkPrompt(true);
     return;
   }
   try {
@@ -879,6 +975,7 @@ async function connectWallet() {
     updateWalletUI();
     await refreshBalance();
     showToast('钱包已连接', 'success');
+    notifyCurrentToolWalletChange();
   } catch (e) {
     console.error('Wallet connection failed:', e);
     showToast('连接钱包失败：' + e.message, 'error');
@@ -891,6 +988,7 @@ function disconnectWallet() {
   state.connected = false;
   updateWalletUI();
   showToast('钱包已断开');
+  notifyCurrentToolWalletChange();
 }
 
 function updateWalletUI() {
