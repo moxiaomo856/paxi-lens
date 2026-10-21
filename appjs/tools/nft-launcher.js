@@ -99,6 +99,19 @@ const _NFT_LANG = {
     ipfsFallback: 'IPFS 不可用，已降级为基础模式',
     ipfsNeedImage: '请先上传封面图或填写图片 URI',
     ipfsLargeImg: '图片超过 100KB，建议开启 IPFS 以降低 Gas 费',
+    // Update on-chain metadata
+    updTitle: '🔄 更新链上元数据',
+    updDescInfo: '已铸造的 NFT 可直接改写链上元数据（名称/图片/描述/属性），无需重新铸造。需用铸造者或该 Token 持有者钱包签名，仅消耗 Gas，无服务费。',
+    updDescLabel: 'NFT 描述',
+    updAttrsLabel: '属性 JSON（可选）',
+    updAttrsPlaceholder: '[{"trait_type":"Series","value":"Genesis"}]',
+    updBtn: '🔄 发送链上更新',
+    updSuccess: '✅ 元数据已更新',
+    updAttrsInvalid: '属性 JSON 格式错误，应为 [{"trait_type":"...","value":"..."}] 数组',
+    updAddrInvalid: '合约地址格式不正确（paxi1 开头，账户 43 位 / 合约 63 位），请从部署记录完整复制',
+    updConfirm: '确认将该元数据写入链上？将直接修改该 NFT 的名称/图片/属性，仅消耗 Gas。\n\n',
+    buildUpdTx: '构建更新交易...',
+    updUriTooLarge: '元数据 token_uri 超过 64KB，链上交易可能失败。请改用 IPFS 链接或压缩图片后再更新。',
   },
   en: {
     title: '🎨 NFT Launcher',
@@ -184,6 +197,19 @@ const _NFT_LANG = {
     ipfsFallback: 'IPFS unavailable, fell back to basic mode',
     ipfsNeedImage: 'Please upload a cover image or enter an image URI',
     ipfsLargeImg: 'Image exceeds 100KB, enable IPFS to reduce gas fees',
+    // Update on-chain metadata
+    updTitle: '🔄 Update On-chain Metadata',
+    updDescInfo: 'Minted NFTs can have their on-chain metadata (name/image/description/attributes) rewritten directly — no re-mint needed. Sign with the minter or token owner wallet; gas only, no service fee.',
+    updDescLabel: 'NFT Description',
+    updAttrsLabel: 'Attributes JSON (optional)',
+    updAttrsPlaceholder: '[{"trait_type":"Series","value":"Genesis"}]',
+    updBtn: '🔄 Send On-chain Update',
+    updSuccess: '✅ Metadata updated',
+    updAttrsInvalid: 'Invalid attributes JSON — expected an array like [{"trait_type":"...","value":"..."}]',
+    updAddrInvalid: 'Invalid contract address format (paxi1..., 43 chars for account / 63 for contract). Copy it in full from the deploy history.',
+    updConfirm: 'Write this metadata on-chain? This directly modifies the NFT name/image/attributes. Gas only.\n\n',
+    buildUpdTx: 'Building update tx...',
+    updUriTooLarge: 'Metadata token_uri exceeds 64KB and the on-chain tx may fail. Use an IPFS link or compress the image before updating.',
   }
 };
 
@@ -391,6 +417,38 @@ function renderNftLauncher() {
       <div class="status-msg" id="metaStatus"></div>
     </div>
 
+    <!-- Update On-chain Metadata -->
+    <div class="card">
+      <div class="card-title">${l('updTitle')}</div>
+      <div class="tool-desc">${l('updDescInfo')}</div>
+      <div class="form-group">
+        <label class="form-label">${l('contractAddr')} *</label>
+        <input type="text" id="updContractAddr" placeholder="paxi1...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${l('tokenId')} *</label>
+        <input type="text" id="updTokenId" placeholder="1786443480877_0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${l('nftName')}</label>
+        <input type="text" id="updName" placeholder="COBRA Genesis #0001 · Viper">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${l('imageUriLabel')}</label>
+        <input type="text" id="updImage" placeholder="https://... 或 ipfs://...">
+      </div>
+      <div class="form-group">
+        <label class="form-label">${l('updDescLabel')}</label>
+        <textarea id="updDesc" maxlength="1000" style="min-height:56px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${l('updAttrsLabel')}</label>
+        <textarea id="updAttrs" placeholder='${l('updAttrsPlaceholder')}' style="min-height:56px;font-family:monospace;font-size:11px;"></textarea>
+      </div>
+      <button class="btn btn-primary btn-block" id="btnUpdateMeta" ${connected ? '' : 'disabled'}>${l('updBtn')}</button>
+      <div class="status-msg" id="nftUpdStatus"></div>
+    </div>
+
     <!-- Deployed Contracts -->
     <div class="card">
       <div class="card-title">📜 ${l('contractHistory')}</div>
@@ -533,6 +591,10 @@ function bindNftLauncherEvents() {
     // Metadata
     const btnMeta = document.getElementById('btnMetadata');
     if (btnMeta) btnMeta.addEventListener('click', () => _genMetadata());
+
+    // Update on-chain metadata
+    const btnUpd = document.getElementById('btnUpdateMeta');
+    if (btnUpd) btnUpd.addEventListener('click', () => _updateNftMeta());
   }, 100);
 }
 
@@ -837,6 +899,114 @@ function _genMetadata() {
     <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent).then(()=>typeof showToast==='function'?showToast('Copied','success'):null)">${l('copyJson')}</button>
   `;
   showToast(l('success'), 'success');
+}
+
+// ========== UPDATE ON-CHAIN METADATA (update_nft_info) ==========
+// bech32 校验（字符集 + 38 位 + 校验和）：复制损坏的地址在签名前拦截
+const _NFTUPD_BECH32 = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+const _NFTUPD_GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+function _nftUpdValidAddr(a) {
+  if (typeof a !== 'string') return false;
+  const m = /^paxi1([qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38}|[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58})$/.exec(a.trim());
+  if (!m) return false;
+  const hrp = [];
+  for (const c of 'paxi') hrp.push(c.charCodeAt(0) >> 5);
+  hrp.push(0);
+  for (const c of 'paxi') hrp.push(c.charCodeAt(0) & 31);
+  const data = [];
+  for (const c of m[1]) data.push(_NFTUPD_BECH32.indexOf(c));
+  let chk = 1;
+  for (const v of hrp.concat(data)) {
+    const top = chk >> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ v;
+    for (let i = 0; i < 5; i++) if ((top >> i) & 1) chk ^= _NFTUPD_GEN[i];
+  }
+  return chk === 1;
+}
+
+async function _updateNftMeta() {
+  const l = _nftL;
+  if (!state || !state.connected) { showToast(l('needWallet'), 'error'); return; }
+  const contractAddr = (document.getElementById('updContractAddr')?.value || '').trim();
+  const tokenId = (document.getElementById('updTokenId')?.value || '').trim();
+  const name = (document.getElementById('updName')?.value || '').trim();
+  const image = (document.getElementById('updImage')?.value || '').trim();
+  const desc = (document.getElementById('updDesc')?.value || '').trim();
+  const attrsRaw = (document.getElementById('updAttrs')?.value || '').trim();
+  if (!contractAddr || !tokenId) { showToast(l('fillAll'), 'warning'); return; }
+  if (!_nftUpdValidAddr(contractAddr)) { showToast(l('updAddrInvalid'), 'error'); return; }
+
+  let attributes = [];
+  if (attrsRaw) {
+    try {
+      attributes = JSON.parse(attrsRaw);
+      if (!Array.isArray(attributes)) throw new Error('not array');
+    } catch (e) { showToast(l('updAttrsInvalid'), 'error'); return; }
+  }
+
+  // 仅使用链上已验证支持的扩展字段（name/description/image/attributes）
+  const extension = { name: name || ('NFT #' + tokenId), description: desc, image, attributes };
+  const metaJson = { name: extension.name, description: desc, image, attributes };
+  const tokenUri = jsonToDataUri(metaJson);
+  if (tokenUri.length > 64 * 1024) { showToast(l('updUriTooLarge'), 'error'); return; }
+
+  const preview = `· Token: ${tokenId}\n· ${l('nftName')}: ${extension.name}\n· ${l('imageUriLabel')}: ${image || '-'}\n· ${l('updAttrsLabel')}: ${attributes.length}`;
+  if (!confirm(l('updConfirm') + '\n' + preview)) return;
+
+  const btn = document.getElementById('btnUpdateMeta');
+  const statusEl = document.getElementById('nftUpdStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> ' + l('buildUpdTx');
+
+  try {
+    const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
+      sender: state.wallet.address,
+      contract: contractAddr,
+      msg: new TextEncoder().encode(JSON.stringify({ update_nft_info: { token_id: tokenId, token_uri: tokenUri, extension } })),
+      funds: [],
+    });
+    const messages = [PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+      value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish(),
+    })];
+
+    btn.innerHTML = '<span class="spinner"></span> ' + l('waiting');
+    const res = await buildSignAndBroadcast(messages, 'Update NFT ' + tokenId, null, state.wallet);
+    const txHash = res?.tx_response?.txhash;
+    if (!txHash) throw new Error('Failed');
+
+    statusEl.className = 'status-msg info';
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<strong>⏳ ${l('broadcasting')}</strong><br><span style="font-size:11px">Tx: <code>${escapeHtml(txHash)}</code></span>`;
+
+    const txResp = res?.tx_response || res;
+    if (txResp.code !== undefined && txResp.code !== 0) throw new Error(txResp.raw_log || 'Failed');
+
+    let pollRes = { success: true, height: null };
+    if (typeof pollTxStatus === 'function') {
+      btn.innerHTML = '<span class="spinner"></span> ' + l('confirmWait');
+      pollRes = await pollTxStatus(txHash, 25);
+      if (!pollRes || !pollRes.confirmed || !pollRes.success) throw new Error(pollRes?.rawLog || 'Failed');
+    }
+
+    statusEl.className = 'status-msg success';
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `
+      <strong>${l('updSuccess')}</strong><br>
+      <span style="font-size:11px">${l('tokenId')}: <code>${escapeHtml(tokenId)}</code></span><br>
+      <span style="font-size:11px">Tx: <code style="word-break:break-all;font-size:11px">${escapeHtml(txHash)}</code></span>
+      ${pollRes && pollRes.height ? `<br><span style="font-size:11px">${l('blockHeight')}: <code>${pollRes.height}</code></span>` : ''}
+    `;
+    showToast(l('updSuccess'), 'success');
+  } catch (e) {
+    statusEl.className = 'status-msg error';
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<strong>❌ ${l('failed')}</strong><br>${escapeHtml(e.message || e)}`;
+    showToast(l('failed'), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = l('updBtn');
+  }
 }
 
 // ========== HISTORY ==========
