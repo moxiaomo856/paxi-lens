@@ -223,7 +223,19 @@ const LANG = {
       queryFail: '查询失败',
       cached: '（来自缓存）',
       exported: '已导出 CSV',
-      disclaimer: '本工具仅查询链上 NFT 数据，不涉及交易服务。'
+      disclaimer: '本工具仅查询链上 NFT 数据，不涉及交易服务。',
+      transferTitle: '📤 转移 NFT',
+      transferDesc: '将该合约下的 NFT 转给接收地址，需持有者钱包签名，仅消耗 Gas，无服务费。',
+      transferContract: 'NFT 合约地址 *',
+      transferTokenId: 'Token ID *',
+      transferRecv: '接收地址 *',
+      transferMemo: '备注（可选）',
+      transferBtn: '📤 转移',
+      transferConfirm: '确认将该 NFT 转移至以下地址？',
+      transferSuccess: '✅ 转移成功',
+      transferAddrInvalid: '地址格式不正确（paxi1 开头，账户 43 位或合约 63 位）',
+      transferNeedWallet: '请先连接钱包',
+      transferring: '转移中...'
     },
     games: {
       title: '🎮 游戏娱乐',
@@ -539,7 +551,19 @@ const LANG = {
       queryFail: 'Query failed',
       cached: '(cached)',
       exported: 'CSV exported',
-      disclaimer: 'This tool only queries on-chain NFT data, no trading services.'
+      disclaimer: 'This tool only queries on-chain NFT data, no trading services.',
+      transferTitle: '📤 Transfer NFT',
+      transferDesc: 'Transfer an NFT from this contract to a recipient. Requires owner wallet signature, gas only, no service fee.',
+      transferContract: 'NFT Contract *',
+      transferTokenId: 'Token ID *',
+      transferRecv: 'Recipient *',
+      transferMemo: 'Memo (optional)',
+      transferBtn: '📤 Transfer',
+      transferConfirm: 'Confirm transferring this NFT to the address below?',
+      transferSuccess: '✅ Transfer successful',
+      transferAddrInvalid: 'Invalid address (paxi1..., 43 chars account or 63 chars contract)',
+      transferNeedWallet: 'Please connect wallet first',
+      transferring: 'Transferring...'
     },
     games: {
       title: '🎮 Game Center',

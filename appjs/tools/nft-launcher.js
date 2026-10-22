@@ -391,35 +391,9 @@ function renderNftLauncher() {
       <div class="status-msg" id="nftMintStatus"></div>
     </div>
 
-    <!-- Metadata -->
+    <!-- Metadata + Update On-chain (merged) -->
     <div class="card">
-      <div class="card-title">📝 ${l('metadataTitle')}</div>
-      <div class="tool-desc">${l('metadataDesc')}</div>
-      <div class="form-group">
-        <label class="form-label">${l('contractAddr')} *</label>
-        <input type="text" id="metaContractAddr" placeholder="paxi1...">
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group">
-          <label class="form-label">${l('tokenId')} *</label>
-          <input type="text" id="metaTokenId" placeholder="1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">${l('nftName')}</label>
-          <input type="text" id="metaName" placeholder="Paxi Punk #1">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">${l('imageUriLabel')}</label>
-        <input type="text" id="metaImage" placeholder="https://...">
-      </div>
-      <button class="btn btn-primary btn-block" id="btnMetadata">${l('saveMetadataBtn')}</button>
-      <div class="status-msg" id="metaStatus"></div>
-    </div>
-
-    <!-- Update On-chain Metadata -->
-    <div class="card">
-      <div class="card-title">${l('updTitle')}</div>
+      <div class="card-title">🖼️ ${l('updTitle')}</div>
       <div class="tool-desc">${l('updDescInfo')}</div>
       <div class="form-group">
         <label class="form-label">${l('contractAddr')} *</label>
@@ -429,13 +403,15 @@ function renderNftLauncher() {
         <label class="form-label">${l('tokenId')} *</label>
         <input type="text" id="updTokenId" placeholder="1786443480877_0">
       </div>
-      <div class="form-group">
-        <label class="form-label">${l('nftName')}</label>
-        <input type="text" id="updName" placeholder="COBRA Genesis #0001 · Viper">
-      </div>
-      <div class="form-group">
-        <label class="form-label">${l('imageUriLabel')}</label>
-        <input type="text" id="updImage" placeholder="https://... 或 ipfs://...">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">${l('nftName')}</label>
+          <input type="text" id="updName" placeholder="COBRA Genesis #0001 · Viper">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${l('imageUriLabel')}</label>
+          <input type="text" id="updImage" placeholder="https://... 或 ipfs://... 或 data:image/...">
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">${l('updDescLabel')}</label>
@@ -445,7 +421,10 @@ function renderNftLauncher() {
         <label class="form-label">${l('updAttrsLabel')}</label>
         <textarea id="updAttrs" placeholder='${l('updAttrsPlaceholder')}' style="min-height:56px;font-family:monospace;font-size:11px;"></textarea>
       </div>
-      <button class="btn btn-primary btn-block" id="btnUpdateMeta" ${connected ? '' : 'disabled'}>${l('updBtn')}</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline btn-block" id="btnMetadata">${l('saveMetadataBtn')}</button>
+        <button class="btn btn-primary btn-block" id="btnUpdateMeta" ${connected ? '' : 'disabled'}>${l('updBtn')}</button>
+      </div>
       <div class="status-msg" id="nftUpdStatus"></div>
     </div>
 
@@ -874,22 +853,32 @@ function _calcMintFee() {
 // ========== METADATA ==========
 function _genMetadata() {
   const l = _nftL;
-  const contractAddr = document.getElementById('metaContractAddr').value.trim();
-  const tokenId = document.getElementById('metaTokenId').value.trim();
+  const contractAddr = (document.getElementById('updContractAddr')?.value || '').trim();
+  const tokenId = (document.getElementById('updTokenId')?.value || '').trim();
   if (!contractAddr || !tokenId) { showToast(l('fillAll'), 'warning'); return; }
 
-  const name = document.getElementById('metaName').value.trim();
-  const image = document.getElementById('metaImage').value.trim();
+  const name = (document.getElementById('updName')?.value || '').trim();
+  const image = (document.getElementById('updImage')?.value || '').trim();
+  const desc = (document.getElementById('updDesc')?.value || '').trim();
+  let attributes = [];
+  const attrsRaw = (document.getElementById('updAttrs')?.value || '').trim();
+  if (attrsRaw) {
+    try {
+      attributes = JSON.parse(attrsRaw);
+      if (!Array.isArray(attributes)) throw new Error('not array');
+    } catch (e) { showToast(l('updAttrsInvalid'), 'error'); return; }
+  }
 
   const metadata = {
     name: name || `NFT #${tokenId}`,
+    description: desc,
     image: image || '',
     external_url: '',
-    attributes: []
+    attributes: attributes
   };
   const jsonStr = JSON.stringify(metadata, null, 2);
 
-  const statusEl = document.getElementById('metaStatus');
+  const statusEl = document.getElementById('nftUpdStatus');
   statusEl.className = 'status-msg success';
   statusEl.style.display = 'block';
   statusEl.innerHTML = `

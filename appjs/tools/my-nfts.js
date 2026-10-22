@@ -60,6 +60,31 @@ function renderMyNfts() {
       <div class="status-msg" id="nftvStatus"></div>
     </div>
 
+    <div class="card">
+      <div class="card-title">${t('myNfts.transferTitle')}</div>
+      <div class="tool-desc">${t('myNfts.transferDesc')}</div>
+      <div class="form-group">
+        <label class="form-label">${t('myNfts.transferContract')}</label>
+        <input type="text" id="nftvTransferContract" placeholder="paxi1...">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">${t('myNfts.transferTokenId')}</label>
+          <input type="text" id="nftvTransferTokenId" placeholder="1786443480877_0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">${t('myNfts.transferRecv')}</label>
+          <input type="text" id="nftvTransferRecv" placeholder="paxi1...">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">${t('myNfts.transferMemo')}</label>
+        <input type="text" id="nftvTransferMemo" placeholder="memo">
+      </div>
+      <button class="btn btn-primary btn-block" id="btnNftvTransfer" ${(state && state.connected) ? '' : 'disabled'}>${t('myNfts.transferBtn')}</button>
+      <div class="status-msg" id="nftvTransferStatus"></div>
+    </div>
+
     <div class="card" id="nftvResultsCard" style="display:none;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
         <div id="nftvSummary" style="font-size:13px;font-weight:700;"></div>
@@ -83,6 +108,9 @@ function bindMyNftsEvents() {
 
     const btnQuery = document.getElementById('btnNftvQuery');
     if (btnQuery) btnQuery.addEventListener('click', queryMyNfts);
+
+    const btnTransfer = document.getElementById('btnNftvTransfer');
+    if (btnTransfer) btnTransfer.addEventListener('click', _transferNft);
 
     const btnLoadMore = document.getElementById('btnNftvLoadMore');
     if (btnLoadMore) btnLoadMore.addEventListener('click', renderNextPage);
@@ -357,6 +385,86 @@ function _resolveDisplay(info, meta) {
     attrs: ext.attributes || m.attributes || [],
     tokenUri: (info && info.token_uri) || '',
   };
+}
+
+// ============ TRANSFER NFT ============
+const _NFTV_BECH32 = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+const _NFTV_GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+function _nftvValidAddr(a) {
+  if (typeof a !== 'string') return false;
+  const m = /^paxi1([qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38}|[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58})$/.exec(a.trim());
+  if (!m) return false;
+  const hrp = [];
+  for (const c of 'paxi') hrp.push(c.charCodeAt(0) >> 5);
+  hrp.push(0);
+  for (const c of 'paxi') hrp.push(c.charCodeAt(0) & 31);
+  const data = [];
+  for (const c of m[1]) data.push(_NFTV_BECH32.indexOf(c));
+  let chk = 1;
+  for (const v of hrp.concat(data)) {
+    const top = chk >> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ v;
+    for (let i = 0; i < 5; i++) if ((top >> i) & 1) chk ^= _NFTV_GEN[i];
+  }
+  return chk === 1;
+}
+
+async function _transferNft() {
+  if (!state || !state.connected) { showToast(t('myNfts.transferNeedWallet'), 'error'); return; }
+  const contract = (document.getElementById('nftvTransferContract')?.value || '').trim();
+  const tokenId = (document.getElementById('nftvTransferTokenId')?.value || '').trim();
+  const recipient = (document.getElementById('nftvTransferRecv')?.value || '').trim();
+  const memo = (document.getElementById('nftvTransferMemo')?.value || '').trim();
+  if (!contract || !tokenId || !recipient) { showToast(t('myNfts.noContract'), 'warning'); return; }
+  if (!_nftvValidAddr(contract)) { showToast(t('myNfts.transferAddrInvalid'), 'error'); return; }
+  if (!_nftvValidAddr(recipient)) { showToast(t('myNfts.transferAddrInvalid'), 'error'); return; }
+
+  if (!confirm(t('myNfts.transferConfirm') + '\n· Token: ' + tokenId + '\n· → ' + recipient)) return;
+
+  const btn = document.getElementById('btnNftvTransfer');
+  const statusEl = document.getElementById('nftvTransferStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> ' + t('myNfts.transferring');
+
+  try {
+    const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
+      sender: state.wallet.address,
+      contract: contract,
+      msg: new TextEncoder().encode(JSON.stringify({ transfer_nft: { token_id: tokenId, recipient } })),
+      funds: [],
+    });
+    const messages = [PaxiCosmJS.Any.fromPartial({
+      typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
+      value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish(),
+    })];
+    btn.innerHTML = '<span class="spinner"></span> ' + t('myNfts.transferring');
+    const res = await buildSignAndBroadcast(messages, 'Transfer NFT ' + tokenId, memo || null, state.wallet);
+    const txHash = res?.tx_response?.txhash;
+    if (!txHash) throw new Error('Failed');
+    statusEl.className = 'status-msg info';
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<strong>⏳ ${t('myNfts.transferring')}</strong><br><span style="font-size:11px">Tx: <code>${escapeHtml(txHash)}</code></span>`;
+    const txResp = res?.tx_response || res;
+    if (txResp.code !== undefined && txResp.code !== 0) throw new Error(txResp.raw_log || 'Failed');
+    let pollRes = { success: true, height: null };
+    if (typeof pollTxStatus === 'function') {
+      btn.innerHTML = '<span class="spinner"></span> ' + t('myNfts.transferring');
+      pollRes = await pollTxStatus(txHash, 25);
+      if (!pollRes || !pollRes.confirmed || !pollRes.success) throw new Error(pollRes?.rawLog || 'Failed');
+    }
+    statusEl.className = 'status-msg success';
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<strong>${t('myNfts.transferSuccess')}</strong><br><span style="font-size:11px">Tx: <code style="word-break:break-all;font-size:11px">${escapeHtml(txHash)}</code></span>`;
+    showToast(t('myNfts.transferSuccess'), 'success');
+  } catch (e) {
+    statusEl.className = 'status-msg error';
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<strong>❌ ${t('myNfts.queryFail')}</strong><br>${escapeHtml(e.message || e)}`;
+    showToast(t('myNfts.queryFail'), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = t('myNfts.transferBtn');
+  }
 }
 
 window.TOOL_REGISTRY['my-nfts'] = {
