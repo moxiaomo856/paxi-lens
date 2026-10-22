@@ -84,6 +84,13 @@ const SHARED_CONFIG = {
   governance: {
     submitFee: 0,
     defaultDeposit: 100,
+    // DAO 提案（社区池拨款 / 资助申请）白名单：仅这些钱包地址连接后可看到该功能
+    daoProposerWhitelist: [
+      'paxi1gzrza9s6frtwenz0p4dpjftjpvjaznn6f2lvh3',
+      'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd',
+      'paxi1qvrmsftn402cumn0axqjc4dgvmkge6lhp0y39j',
+      'paxi1fl8j6gewhs2yz3tztr5dlvsmpp0d7gaxka73e5',
+    ],
   },
 };
 

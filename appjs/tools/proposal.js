@@ -64,8 +64,47 @@ function _isValidPaxiAddress(a) {
   return chk === 1;
 }
 
+// 构造 gov v1 MsgSubmitProposal{messages:[MsgCommunityPoolSpend]}（与链上已通过的 #13 资助提案同构）
+// 返回 Any（可放入 tx messages）
+function _buildPoolSpendProposalAny({ title, summary, recipient, amountMicro, depositMicro, proposer, denom }) {
+  const spendMsg = PaxiCosmJS.Any.fromPartial({
+    typeUrl: GOV_V1_TYPE_URL.poolMsg,
+    value: PaxiCosmJS.MsgCommunityPoolSpend.encode({
+      authority: GOV_MODULE_ACCOUNT,
+      recipient,
+      amount: [{ denom, amount: amountMicro }],
+    }).finish(),
+  });
+  const submitValueBytes = PaxiCosmJS.MsgSubmitProposalV1.encode({
+    messages: [spendMsg],
+    initial_deposit: [{ denom, amount: depositMicro }],
+    proposer,
+    metadata: '',
+    title,
+    summary: (summary || '').length > 2000 ? summary.slice(0, 2000) : (summary || ''),
+    expedited: false,
+  }).finish();
+  return PaxiCosmJS.Any.fromPartial({
+    typeUrl: GOV_V1_TYPE_URL.submitV1,
+    value: submitValueBytes,
+  });
+}
+
 function govConfig() {
   return (typeof SHARED_CONFIG !== 'undefined' && SHARED_CONFIG.governance) || { submitFee: 50, defaultDeposit: 100 };
+}
+
+// ===== DAO 提案白名单 =====
+// 仅白名单钱包地址连接后可看到 / 使用「DAO 资助申请（社区池拨款）」功能
+function daoWhitelist() {
+  const cfg = govConfig();
+  return Array.isArray(cfg.daoProposerWhitelist) ? cfg.daoProposerWhitelist : [];
+}
+
+// 当前连接的钱包是否在 DAO 白名单内
+function isDaoProposerAllowed() {
+  if (typeof state === 'undefined' || !state.connected || !state.wallet || !state.wallet.address) return false;
+  return daoWhitelist().includes(state.wallet.address);
 }
 
 function renderProposal() {
@@ -74,7 +113,6 @@ function renderProposal() {
     <select id="proposalType" onchange="toggleProposalType(this.value)">
       <option value="text">${_t('proposal.typeText','文本提案')}</option>
       <option value="param">${_t('proposal.typeParam','参数修改提案')}</option>
-      <option value="pool">${_t('proposal.typePool','🏦 社区池拨款（DAO 资助申请）')}</option>
     </select>`;
   const paramSubL = _t('proposal.paramSubspace','参数模块 (subspace)');
   const paramKL  = _t('proposal.paramKey','参数名 (key)');
@@ -137,35 +175,6 @@ function renderProposal() {
           </div>
         </div>
 
-        <!-- 社区池拨款专属区域（默认隐藏） -->
-        <div id="proposalPoolBlock" style="display:none;margin-bottom:14px;">
-          <div style="padding:12px 14px;background:rgba(14,165,233,.08);border:1px dashed #0ea5e9;border-radius:var(--radius);">
-            <div style="font-weight:700;font-size:13px;margin-bottom:10px;">${_t('proposal.poolBlockTitle','🏦 社区池拨款配置 (CommunityPoolSpendProposal)')}</div>
-
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.6;">
-              ${_t('proposal.poolDesc','若提案通过，社区池将向以下收款地址划拨指定数量的 PAXI（DAO 资助申请）。')}
-            </div>
-
-            <div style="font-size:11px;color:#0ea5e9;padding:8px 10px;background:rgba(14,165,233,.08);border-radius:6px;margin-bottom:12px;line-height:1.6;">
-              ${_t('proposal.poolTip','💡 资助申请说明：标题与摘要会公示给全体持币人投票。请在描述中写明用途、金额构成、里程碑与交付时间；收款地址建议使用项目运营金库地址。')}
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">${_t('proposal.poolRecipient','收款地址 (recipient)')}</label>
-              <input type="text" id="proposalPoolRecipient" placeholder="paxi1...">
-            </div>
-
-            <div class="form-group" style="margin-bottom:8px;">
-              <label class="form-label">${_t('proposal.poolAmount','拨款金额 (PAXI)')}</label>
-              <input type="number" id="proposalPoolAmount" min="0" step="0.01" placeholder="150000">
-            </div>
-
-            <div style="font-size:11px;color:var(--text-muted);padding:8px 10px;background:var(--bg-card);border-radius:6px;" id="proposalPoolBalance">
-              ${_t('proposal.poolBalanceLoading','正在查询链上社区池余额...')}
-            </div>
-          </div>
-        </div>
-
         <div class="form-group">
           <label class="form-label">${_t('proposal.deposit','押金 (PAXI)')}</label>
           <input type="number" id="proposalDeposit" value="${cfg.defaultDeposit}" min="0" step="0.01">
@@ -187,12 +196,79 @@ function renderProposal() {
       </div>
     </div>
 
+    <div id="daoProposalSlot">${renderDaoProposalCard()}</div>
+
     <div class="card">
       <div class="card-title">${_t('proposal.list','提案列表')}</div>
       <div style="margin:0 0 12px;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:6px;font-size:11px;color:var(--text-muted);line-height:1.6;">
         ${t('disclaimer.proposalList')}
       </div>
       <div id="proposalList"><p style="color:var(--text-muted);text-align:center;padding:20px;">${_t('proposal.listLoading','加载中...')}</p></div>
+    </div>
+  `;
+}
+
+// ===== DAO 资助申请卡片（仅白名单钱包地址可见）=====
+function renderDaoProposalCard() {
+  // 未连接钱包：不显示该功能
+  if (typeof state === 'undefined' || !state.connected || !state.wallet || !state.wallet.address) return '';
+  // 已连接但不在白名单：不显示该功能
+  if (!isDaoProposerAllowed()) return '';
+
+  const cfg = govConfig();
+  return `
+    <div class="card" id="daoProposalCard">
+      <div class="card-title">${_t('proposal.daoTitle','🏦 DAO 资助申请')}</div>
+      <div class="tool-desc" style="margin-bottom:12px;">${_t('proposal.daoDesc','向社区池申请资助（CommunityPoolSpend）。提案通过后，社区池将向指定收款地址划拨拨款。')}</div>
+      <div class="info-box" style="margin-bottom:12px;">${_t('proposal.daoInfo','💡 标题与摘要会公示给全体持币人投票。请写明用途、金额构成、里程碑与交付时间；收款地址建议使用项目运营金库地址。')}</div>
+
+      <div class="form-group">
+        <label class="form-label">${_t('proposal.daoLabelTitle','提案标题')}</label>
+        <input type="text" id="daoPropTitle" placeholder="${_t('proposal.daoTitlePlaceholder','例如：Paxi 棋阁上线与三个月运维资助 (150,000 PAXI)')}">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">${_t('proposal.daoLabelSummary','提案摘要 (summary)')}</label>
+        <textarea id="daoPropSummary" rows="3" placeholder="${_t('proposal.daoSummaryPlaceholder','一句话概括申请内容与金额…')}"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">${_t('proposal.daoLabelDesc','提案详情 (description)')}</label>
+        <textarea id="daoPropDesc" rows="5" placeholder="${_t('proposal.daoDescPlaceholder','详细说明用途、预算构成、里程碑与交付时间…')}"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">${_t('proposal.poolRecipient','收款地址 (recipient)')}</label>
+        <input type="text" id="daoPropRecipient" placeholder="paxi1...">
+      </div>
+
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label">${_t('proposal.poolAmount','拨款金额 (PAXI)')}</label>
+        <input type="number" id="daoPropAmount" min="0" step="0.01" placeholder="150000">
+      </div>
+
+      <div style="font-size:11px;color:var(--text-muted);padding:8px 10px;background:var(--bg-card);border-radius:6px;margin-bottom:12px;" id="daoPropBalance">
+        ${_t('proposal.poolBalanceLoading','正在查询链上社区池余额...')}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">${_t('proposal.deposit','押金 (PAXI)')}</label>
+        <input type="number" id="daoPropDeposit" value="${cfg.defaultDeposit}" min="0" step="0.01">
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
+        <span style="font-size:13px;color:var(--text-muted);">${_t('proposal.fee','服务费 (PAXI)')}</span>
+        <span style="color:var(--primary);font-weight:700;font-size:15px;">${cfg.submitFee} PAXI</span>
+      </div>
+
+      <div style="margin:0 0 12px;padding:8px 12px;background:rgba(255,255,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:6px;font-size:12px;color:#ffd700;line-height:1.6;">
+        ${t('disclaimer.proposalSubmit')}
+      </div>
+
+      <button class="btn btn-chain" id="daoPropSubmitBtn" style="width:100%;font-weight:700;font-size:14px;min-height:42px;">
+        🏦 ${_t('proposal.daoSubmitBtn','提交 DAO 资助申请')}
+      </button>
+      <div class="status-msg" id="daoPropStatus" style="margin-top:10px;"></div>
     </div>
   `;
 }
@@ -225,11 +301,6 @@ function escapeAttr(s) { if (s == null) return ''; return String(s).replace(/"/g
 function toggleProposalType(val) {
   const box = document.getElementById('proposalParamBlock');
   if (box) box.style.display = (val === 'param') ? 'block' : 'none';
-  const poolBox = document.getElementById('proposalPoolBlock');
-  if (poolBox) {
-    poolBox.style.display = (val === 'pool') ? 'block' : 'none';
-    if (val === 'pool') loadCommunityPoolBalance();
-  }
 }
 
 // 查询链上社区池余额（只读，无费用）
@@ -246,8 +317,8 @@ function _decCoinToPaxi(amountStr) {
   return typeof upaxiToPaxi === 'function' ? upaxiToPaxi(intPart) : (parseInt(intPart, 10) / 1e6).toFixed(6);
 }
 
-async function loadCommunityPoolBalance() {
-  const el = document.getElementById('proposalPoolBalance');
+async function loadCommunityPoolBalance(elId) {
+  const el = document.getElementById(elId || 'proposalPoolBalance');
   if (!el) return;
   try {
     const lcd = typeof CONFIG !== 'undefined' ? CONFIG.lcd : getLCD();
@@ -294,11 +365,234 @@ function removeProposalParamRow(btn) {
   row.remove();
 }
 
+// ===== DAO 资助申请（社区池拨款）=====
+// 独立于普通治理提案：仅白名单钱包地址可见/可用
+
+// 绑定 DAO 卡片内部事件
+function bindDaoProposalEvents() {
+  const btn = document.getElementById('daoPropSubmitBtn');
+  if (btn && !btn._daoBound) {
+    btn._daoBound = true;
+    btn.addEventListener('click', submitDaoProposal);
+  }
+  const balEl = document.getElementById('daoPropBalance');
+  if (balEl && !balEl._balanceLoaded) {
+    balEl._balanceLoaded = true;
+    loadCommunityPoolBalance('daoPropBalance');
+  }
+}
+
+// 钱包连接/断开后刷新 DAO 卡片显隐（返回 true 表示发生了 DOM 变化）
+function refreshDaoProposalSlot() {
+  const slot = document.getElementById('daoProposalSlot');
+  if (!slot) return false;
+  const allowed = isDaoProposerAllowed();
+  const has = !!slot.querySelector('#daoProposalCard');
+  if (allowed === has) return false;
+  slot.innerHTML = renderDaoProposalCard();
+  if (allowed) bindDaoProposalEvents();
+  return true;
+}
+
+// 提交 DAO 资助申请（社区池拨款）
+async function submitDaoProposal() {
+  // 白名单二次校验（前端显隐只是第一道门，这里是提交前的强校验）
+  if (!isDaoProposerAllowed()) {
+    showStatus('daoPropStatus', _t('proposal.daoNotAllowed','当前钱包地址无 DAO 资助申请权限'), 'error');
+    return;
+  }
+  if (typeof state === 'undefined' || !state.connected || !state.wallet || !state.wallet.address) {
+    showStatus('daoPropStatus', _t('proposal.connectFirst','请先连接钱包'), 'warning');
+    return;
+  }
+
+  const titleEl = document.getElementById('daoPropTitle');
+  const sumEl   = document.getElementById('daoPropSummary');
+  const descEl  = document.getElementById('daoPropDesc');
+  const rcvEl   = document.getElementById('daoPropRecipient');
+  const amtEl   = document.getElementById('daoPropAmount');
+  const depEl   = document.getElementById('daoPropDeposit');
+  const btn     = document.getElementById('daoPropSubmitBtn');
+  if (!titleEl || !sumEl || !descEl || !rcvEl || !amtEl || !depEl) return;
+
+  const title = titleEl.value.trim();
+  const summary = sumEl.value.trim();
+  const desc = descEl.value.trim();
+  const recipient = rcvEl.value.trim();
+  const amount = parseFloat(amtEl.value) || 0;
+  const depositNum = parseFloat(depEl.value) || 0;
+  const cfg = govConfig();
+  const feeNum = Number(cfg.submitFee) || 0;
+
+  if (!title) {
+    showStatus('daoPropStatus', _t('proposal.daoNoTitle','请填写提案标题'), 'warning');
+    return;
+  }
+  if (!summary) {
+    showStatus('daoPropStatus', _t('proposal.daoNoSummary','请填写提案摘要 (summary)'), 'warning');
+    return;
+  }
+  if (!desc) {
+    showStatus('daoPropStatus', _t('proposal.daoNoDesc','请填写提案详情 (description)'), 'warning');
+    return;
+  }
+  if (!recipient) {
+    showStatus('daoPropStatus', _t('proposal.poolNoRecipient','请填写收款地址'), 'warning');
+    return;
+  }
+  if (!_isValidPaxiAddress(recipient)) {
+    showStatus('daoPropStatus', _t('proposal.poolBadRecipient','收款地址格式不正确（paxi1...）'), 'error');
+    return;
+  }
+  if (!(amount > 0)) {
+    showStatus('daoPropStatus', _t('proposal.poolBadAmount','拨款金额必须大于 0'), 'warning');
+    return;
+  }
+  if (depositNum <= 0) {
+    showStatus('daoPropStatus', _t('proposal.invalidDeposit','押金必须大于 0'), 'warning');
+    return;
+  }
+  // 金额不得超过链上社区池余额
+  try {
+    const lcd = typeof CONFIG !== 'undefined' ? CONFIG.lcd : getLCD();
+    const res = await fetch(`${lcd}/cosmos/distribution/v1beta1/community_pool`);
+    if (res.ok) {
+      const data = await res.json();
+      const denom = CONFIG.denom || 'upaxi';
+      const pool = (data.pool || []).find(c => c.denom === denom) || (data.pool || [])[0];
+      if (pool) {
+        const poolPaxi = _decCoinToPaxi(pool.amount);
+        if (amount > parseFloat(poolPaxi)) {
+          showStatus('daoPropStatus',
+            _t('proposal.poolExceed','拨款金额超过链上社区池余额') + ` (${poolPaxi} PAXI)`, 'error');
+          return;
+        }
+      }
+    }
+  } catch (e) { /* 余额校验失败不阻塞提交，交由链上判定 */ }
+
+  // 显式确认金额与收款地址
+  const confirmMsg = _t('proposal.confirmSubmitPool','确认提交社区池拨款提案（DAO 资助申请）？\n\n拨款金额：{amount} PAXI\n收款地址：{rcv}\n\n提案通过后社区池将向该地址划拨 {amount} PAXI。\n服务费 {fee} PAXI + 押金 {deposit} PAXI。')
+    .replace('{amount}', amount).replace('{rcv}', recipient)
+    .replace('{fee}', feeNum).replace('{deposit}', depositNum);
+  if (!confirm(confirmMsg)) return;
+
+  const oldText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> ${_t('proposal.submitting','提交中...')}`;
+  showStatus('daoPropStatus', _t('common.loading','加载中...'), 'info');
+
+  try {
+    const denom = CONFIG.denom;
+    const proposer = state.wallet.address;
+    const amountMicro = paxiToUpaxi(amount.toFixed(6));
+    const depositMicro = paxiToUpaxi(depositNum.toFixed(6));
+
+    const messages = [
+      _buildPoolSpendProposalAny({
+        title, summary, recipient, amountMicro, depositMicro, proposer, denom,
+      }),
+    ];
+
+    // 平台服务费（单收款地址）
+    if (feeNum > 0) {
+      const feeMicro = paxiToUpaxi(feeNum.toFixed(6));
+      const feeCollector = (typeof SHARED_CONFIG !== 'undefined' && SHARED_CONFIG.feeCollector) || CONFIG.feeCollector;
+      const feeMsg = PaxiCosmJS.MsgSend.fromPartial({
+        fromAddress: proposer,
+        toAddress: feeCollector,
+        amount: [PaxiCosmJS.coins(feeMicro, denom)[0]],
+      });
+      messages.push(PaxiCosmJS.Any.fromPartial({
+        typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+        value: PaxiCosmJS.MsgSend.encode(feeMsg).finish(),
+      }));
+    }
+
+    const res = await buildSignAndBroadcast(messages, `[DAO Funding] ${title.substring(0, 40)}`, null, state.wallet);
+
+    const txResp = res?.tx_response || res;
+    const txHash = txResp?.txhash;
+    const txCode = txResp?.code;
+    const txRawLog = txResp?.raw_log || res?.message || '';
+    if (txCode !== undefined && txCode !== 0) {
+      throw new Error(`交易失败 (code=${txCode}): ${txRawLog}`);
+    }
+
+    showStatus('daoPropStatus', `📡 已广播，等待确认 (tx: ${txHash ? txHash.slice(0,12)+'...' : '-'})`, 'info');
+
+    let proposalId = null;
+    let txConfirmed = false;
+    let txErrorMessage = '';
+    if (typeof pollTxStatus === 'function' && txHash) {
+      try {
+        const info = await pollTxStatus(txHash, 25);
+        if (info) {
+          if (info.confirmed && info.success) {
+            txConfirmed = true;
+            if (info.events) {
+              for (const ev of info.events) {
+                if (ev.type === 'submit_proposal' && ev.attributes) {
+                  for (const attr of ev.attributes) {
+                    const k = attr.key ? (typeof atob === 'function' ? atob(attr.key) : attr.key) : '';
+                    const v = attr.value ? (typeof atob === 'function' ? atob(attr.value) : attr.value) : '';
+                    if (k === 'proposal_id') { proposalId = v; break; }
+                  }
+                }
+                if (proposalId) break;
+              }
+            }
+          } else if (info.confirmed && !info.success) {
+            txErrorMessage = info.rawLog || `code=${info.code}`;
+          } else {
+            txErrorMessage = '超时未确认（可能 gas 不足或网络拥堵）';
+          }
+        } else {
+          txErrorMessage = '超时未确认';
+        }
+      } catch (e) {
+        txErrorMessage = e.message || String(e);
+      }
+    }
+
+    if (!txConfirmed) {
+      const failMsg = _t('proposal.fail','❌ 提案提交失败：') + (txErrorMessage || '交易未上链确认');
+      showStatus('daoPropStatus', failMsg, 'error');
+      showToast(failMsg, 'error');
+      return;
+    }
+
+    const okText = _t('proposal.daoSuccess','✅ DAO 资助申请提交成功！提案 ID：') + (proposalId || '（已上链，请在下方列表查看）');
+    showStatus('daoPropStatus', okText, 'success');
+    showToast(okText, 'success');
+    setTimeout(loadProposalList, 2500);
+  } catch (e) {
+    console.error(e);
+    let msg = _t('proposal.fail','❌ 提案提交失败：') + (e.message || String(e));
+    if (typeof mapError === 'function') msg = _t('proposal.fail','❌ 提案提交失败：') + mapError(e);
+    showStatus('daoPropStatus', msg, 'error');
+    showToast(msg, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = oldText;
+  }
+}
+
 function bindProposalEvents() {
   // 默认类型是 text，所以 param 区域隐藏
   const sel = document.getElementById('proposalType');
   if (sel) toggleProposalType(sel.value);
+  // DAO 卡片：显隐与钱包状态联动 + 绑定内部事件
+  refreshDaoProposalSlot();
+  bindDaoProposalEvents();
   loadProposalList();
+}
+
+// 钱包连接/断开时由 notifyCurrentToolWalletChange() 触发
+// 只刷新 DAO 卡片显隐，不重载提案列表（避免无谓的链上请求）
+function onProposalWalletChange() {
+  refreshDaoProposalSlot();
+  bindDaoProposalEvents();
 }
 
 function collectParamChanges() {
@@ -325,7 +619,7 @@ async function submitProposal() {
   const btn = document.getElementById('proposalSubmitBtn');
   if (!titleEl || !descEl || !depositEl || !typeEl) return;
 
-  const type = typeEl.value === 'param' ? 'param' : (typeEl.value === 'pool' ? 'pool' : 'text');
+  const type = typeEl.value === 'param' ? 'param' : 'text';
   const title = titleEl.value.trim();
   const desc = descEl.value.trim();
   const depositNum = parseFloat(depositEl.value) || 0;
@@ -342,8 +636,6 @@ async function submitProposal() {
   }
   // 参数校验
   let changes = [];
-  let poolRecipient = '';
-  let poolAmount = 0;
   if (type === 'param') {
     const rows = collectParamChanges();
     if (!rows.length) {
@@ -358,49 +650,9 @@ async function submitProposal() {
     }
     changes = rows.map(r => ({ subspace: r.sub, key: r.key, value: r.val }));
   }
-  if (type === 'pool') {
-    const rcvEl = document.getElementById('proposalPoolRecipient');
-    const amtEl = document.getElementById('proposalPoolAmount');
-    poolRecipient = (rcvEl?.value || '').trim();
-    poolAmount = parseFloat(amtEl?.value) || 0;
-    if (!poolRecipient) {
-      showStatus('proposalStatus', _t('proposal.poolNoRecipient','请填写收款地址'), 'warning');
-      return;
-    }
-    if (!_isValidPaxiAddress(poolRecipient)) {
-      showStatus('proposalStatus', _t('proposal.poolBadRecipient','收款地址格式不正确（paxi1...）'), 'error');
-      return;
-    }
-    if (!(poolAmount > 0)) {
-      showStatus('proposalStatus', _t('proposal.poolBadAmount','拨款金额必须大于 0'), 'warning');
-      return;
-    }
-    // 金额不得超过链上社区池余额
-    try {
-      const lcd = typeof CONFIG !== 'undefined' ? CONFIG.lcd : getLCD();
-      const res = await fetch(`${lcd}/cosmos/distribution/v1beta1/community_pool`);
-      if (res.ok) {
-        const data = await res.json();
-        const denom = CONFIG.denom || 'upaxi';
-        const pool = (data.pool || []).find(c => c.denom === denom) || (data.pool || [])[0];
-        if (pool) {
-          const poolPaxi = _decCoinToPaxi(pool.amount);
-          if (poolAmount > parseFloat(poolPaxi)) {
-            showStatus('proposalStatus',
-              _t('proposal.poolExceed','拨款金额超过链上社区池余额') + ` (${poolPaxi} PAXI)`, 'error');
-            return;
-          }
-        }
-      }
-    } catch (e) { /* 余额校验失败不阻塞提交，交由链上判定 */ }
-  }
 
-  const confirmMsg = type === 'pool'
-    ? _t('proposal.confirmSubmitPool','确认提交社区池拨款提案（DAO 资助申请）？\n\n拨款金额：{amount} PAXI\n收款地址：{rcv}\n\n提案通过后社区池将向该地址划拨 {amount} PAXI。\n服务费 {fee} PAXI + 押金 {deposit} PAXI。')
-        .replace('{amount}', poolAmount).replace('{rcv}', poolRecipient)
-        .replace('{fee}', feeNum).replace('{deposit}', depositNum)
-    : _t('proposal.confirmSubmit','确认支付 {fee} PAXI 服务费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。')
-        .replace('{fee}', feeNum).replace('{deposit}', depositNum);
+  const confirmMsg = _t('proposal.confirmSubmit','确认支付 {fee} PAXI 服务费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。')
+    .replace('{fee}', feeNum).replace('{deposit}', depositNum);
   if (!confirm(confirmMsg)) return;
 
   const oldText = btn.innerHTML;
@@ -414,60 +666,29 @@ async function submitProposal() {
 
     // 构造 content Any（text / param 走 legacy content）
     let contentAny = null;
-    let submitTypeUrl = '/cosmos.gov.v1beta1.MsgSubmitProposal';
-    let submitValue = null;
-    let v1Messages = null;
+    const submitTypeUrl = '/cosmos.gov.v1beta1.MsgSubmitProposal';
 
     if (type === 'text') {
       contentAny = PaxiCosmJS.Any.fromPartial({
         typeUrl: GOV_TYPE_URL.text,
         value: PaxiCosmJS.TextProposal.encode({ title, description: desc }).finish(),
       });
-    } else if (type === 'param') {
+    } else {
       contentAny = PaxiCosmJS.Any.fromPartial({
         typeUrl: GOV_TYPE_URL.param,
         value: PaxiCosmJS.ParameterChangeProposal.encode({ title, description: desc, changes }).finish(),
       });
-    } else {
-      // 社区池拨款：v1 gov 方式（与链上已通过的 #13 资助提案同构）
-      // messages = [ MsgCommunityPoolSpend{authority=gov模块账户, recipient, amount} ]
-      const amountMicro = paxiToUpaxi(poolAmount.toFixed(6));
-      const spendMsg = PaxiCosmJS.Any.fromPartial({
-        typeUrl: GOV_V1_TYPE_URL.poolMsg,
-        value: PaxiCosmJS.MsgCommunityPoolSpend.encode({
-          authority: GOV_MODULE_ACCOUNT,
-          recipient: poolRecipient,
-          amount: [{ denom, amount: amountMicro }],
-        }).finish(),
-      });
-      v1Messages = [spendMsg];
-      submitTypeUrl = GOV_V1_TYPE_URL.submitV1;
     }
 
     // MsgSubmitProposal
     const depositMicro = paxiToUpaxi(depositNum.toFixed(6));
     const depositCoins = [{ denom, amount: depositMicro }];
-    let submitValueBytes;
-    if (v1Messages) {
-      // v1: { messages, initial_deposit, proposer, metadata, title, summary, expedited }
-      const summary = desc.length > 2000 ? desc.slice(0, 2000) : desc;
-      submitValueBytes = PaxiCosmJS.MsgSubmitProposalV1.encode({
-        messages: v1Messages,
-        initial_deposit: depositCoins,
-        proposer,
-        metadata: '',
-        title,
-        summary,
-        expedited: false,
-      }).finish();
-    } else {
-      const submitMsg = PaxiCosmJS.MsgSubmitProposal.fromPartial({
-        content: contentAny,
-        initialDeposit: depositCoins,
-        proposer,
-      });
-      submitValueBytes = PaxiCosmJS.MsgSubmitProposal.encode(submitMsg).finish();
-    }
+    const submitMsg = PaxiCosmJS.MsgSubmitProposal.fromPartial({
+      content: contentAny,
+      initialDeposit: depositCoins,
+      proposer,
+    });
+    const submitValueBytes = PaxiCosmJS.MsgSubmitProposal.encode(submitMsg).finish();
 
     const messages = [
       PaxiCosmJS.Any.fromPartial({
@@ -491,7 +712,7 @@ async function submitProposal() {
       }));
     }
 
-    const typeTag = type === 'text' ? 'Text' : (type === 'param' ? 'ParamChange' : 'CommunityPoolSpend');
+    const typeTag = type === 'text' ? 'Text' : 'ParamChange';
     const summary = `[${typeTag} Proposal] ${title.substring(0, 40)}`;
     const res = await buildSignAndBroadcast(messages, summary, null, state.wallet);
 
@@ -842,13 +1063,17 @@ function normalizeProposal(p) {
   // 提取 proposer：不同版本 API 字段位置不同
   let proposer = p.proposer || null;
   if (!proposer && p.proposal) proposer = p.proposal.proposer || null;
-  // v1beta1 有时把 proposer 放在 proposal 根对象里
+  // v1 API 用 id，v1beta1 用 proposal_id
+  const pid = p.proposal_id || p.id || null;
   return {
-    proposal_id: p.proposal_id || p.id,
+    proposal_id: pid,
+    id: pid,
     status: typeof p.status === 'number' ? p.status : statusStrToNum(p.status),
     total_deposit: p.total_deposit || [],
     submit_time: p.submit_time || '',
     content: p.content || null,
+    // v1 API：messages 数组
+    messages: p.messages || null,
     title: extractProposalTitle(p),
     proposer: proposer,
     // 保存原始数据，后续可继续挖掘
@@ -857,6 +1082,13 @@ function normalizeProposal(p) {
 }
 // 从 content 提取提案类型（用于列表徽章）
 function proposalTypeTag(p) {
+  // v1 API：messages 数组（每项带 @type）
+  const msgs = p?.messages || p?._raw?.messages || null;
+  if (Array.isArray(msgs) && msgs.length) {
+    const t = msgs[0]?.['@type'] || msgs[0]?.type_url || msgs[0]?.typeUrl || '';
+    if (t) return _govTypeTagByUrl(t);
+  }
+  // v1beta1 API：content（{ "@type": ... } 或 { type_url, value }）
   const c = p?.content || p?._raw?.content || null;
   let typeUrl = '';
   if (c) {
@@ -864,6 +1096,11 @@ function proposalTypeTag(p) {
     else if (c['@type']) typeUrl = c['@type'];
     else if (c.type_url || c.typeUrl) typeUrl = c.type_url || c.typeUrl;
   }
+  if (!typeUrl) return null;
+  return _govTypeTagByUrl(typeUrl);
+}
+
+function _govTypeTagByUrl(typeUrl) {
   if (!typeUrl) return null;
   if (typeUrl.includes('CommunityPoolSpend')) {
     return { label: _t('proposal.badgePool','🏦 社区池拨款'), color: '#0ea5e9', bg: 'rgba(14,165,233,.15)' };
@@ -877,11 +1114,20 @@ function proposalTypeTag(p) {
   if (typeUrl.includes('SoftwareUpgrade')) {
     return { label: _t('proposal.badgeUpgrade','⬆️ 软件升级'), color: '#22c55e', bg: 'rgba(34,197,94,.15)' };
   }
+  if (typeUrl.includes('MsgUpdateParams')) {
+    return { label: _t('proposal.badgeParam','🔧 参数修改'), color: '#f59e0b', bg: 'rgba(245,158,11,.15)' };
+  }
+  if (typeUrl.includes('MsgRecoverClient')) {
+    return { label: _t('proposal.badgeClient','🔗 IBC 客户端恢复'), color: '#a855f7', bg: 'rgba(168,85,247,.15)' };
+  }
   return { label: typeUrl.split('.').pop(), color: 'var(--text-muted)', bg: 'rgba(255,255,255,.08)' };
 }
 
 function extractProposalTitle(p) {
   try {
+    // v1 API：直接带 title 字段
+    if (typeof p.title === 'string' && p.title) return p.title;
+    if (typeof p.summary === 'string' && p.summary) return p.summary;
     if (p.content) {
       // v1beta1 Any: { typeUrl, value(base64 of TextProposal) }
       if (p.content.type_url || p.content.typeUrl) {
@@ -962,7 +1208,9 @@ async function loadProposalList() {
       'PROPOSAL_STATUS_REJECTED',
       'PROPOSAL_STATUS_FAILED',
     ];
-    for (const apiVer of ['/cosmos/gov/v1beta1/proposals', '/cosmos/gov/v1/proposals']) {
+    // 优先 v1 API（带 title/summary/messages，proposer 字段齐全）；
+    // v1beta1 的 status 过滤参数不兼容（HTTP 400），且不返回标题 → 仅作兜底
+    for (const apiVer of ['/cosmos/gov/v1/proposals', '/cosmos/gov/v1beta1/proposals']) {
       const all = [];
       let okCount = 0;
       for (const st of statuses) {
@@ -979,7 +1227,7 @@ async function loadProposalList() {
         break;
       }
       // 如果分状态查询全部失败，尝试不带 status 查全部
-      if (apiVer === '/cosmos/gov/v1beta1/proposals') {
+      if (apiVer === '/cosmos/gov/v1/proposals') {
         try {
           const res = await fetch(`${lcd}${apiVer}?pagination.limit=100&pagination.reverse=true`);
           if (res.ok) {
@@ -1081,7 +1329,7 @@ async function fetchProposer(proposalId, lcd) {
     let addr = _proposalProposerMap[proposalId] || null;
     // 尝试从单独的 proposer API 查询
     if (!addr) {
-      for (const apiVer of ['/cosmos/gov/v1beta1/proposals', '/cosmos/gov/v1/proposals']) {
+      for (const apiVer of ['/cosmos/gov/v1/proposals', '/cosmos/gov/v1beta1/proposals']) {
         try {
           const res = await fetch(`${lcd}${apiVer}/${proposalId}/proposer`);
           if (!res.ok) continue;
@@ -1094,7 +1342,7 @@ async function fetchProposer(proposalId, lcd) {
     }
     // 再试一次：直接查单条 proposal 详情，数据里可能有 proposer
     if (!addr) {
-      for (const apiVer of ['/cosmos/gov/v1beta1/proposals', '/cosmos/gov/v1/proposals']) {
+      for (const apiVer of ['/cosmos/gov/v1/proposals', '/cosmos/gov/v1beta1/proposals']) {
         try {
           const res = await fetch(`${lcd}${apiVer}/${proposalId}`);
           if (!res.ok) continue;
@@ -1128,5 +1376,5 @@ async function fetchProposer(proposalId, lcd) {
   }
 }
 
-window.TOOL_REGISTRY['proposal'] = { render: renderProposal, bind: bindProposalEvents, onMount: bindProposalEvents };
+window.TOOL_REGISTRY['proposal'] = { render: renderProposal, bind: bindProposalEvents, onMount: onProposalWalletChange };
 window.cancelProposal = cancelProposal;
