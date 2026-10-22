@@ -13,6 +13,13 @@ const GOV_TYPE_URL = {
   param: '/cosmos.params.v1beta1.ParameterChangeProposal',
   pool: '/cosmos.distribution.v1beta1.CommunityPoolSpendProposal',
 };
+// v1 方式提交社区池拨款（与链上已通过的 #13 资助提案同构）
+const GOV_V1_TYPE_URL = {
+  poolMsg: '/cosmos.distribution.v1beta1.MsgCommunityPoolSpend',
+  submitV1: '/cosmos.gov.v1.MsgSubmitProposal',
+};
+// gov module account（MsgCommunityPoolSpend 的 authority 必须是它）
+const GOV_MODULE_ACCOUNT = 'paxi10d07y265gmmuvt4z0w9aw880jnsr700je7h2vr';
 const GOV_STATUS = {
   0: { label: '未知', cls: 'warning' },
   1: { label: '押金中', cls: 'info' },
@@ -137,6 +144,10 @@ function renderProposal() {
 
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.6;">
               ${_t('proposal.poolDesc','若提案通过，社区池将向以下收款地址划拨指定数量的 PAXI（DAO 资助申请）。')}
+            </div>
+
+            <div style="font-size:11px;color:#0ea5e9;padding:8px 10px;background:rgba(14,165,233,.08);border-radius:6px;margin-bottom:12px;line-height:1.6;">
+              ${_t('proposal.poolTip','💡 资助申请说明：标题与摘要会公示给全体持币人投票。请在描述中写明用途、金额构成、里程碑与交付时间；收款地址建议使用项目运营金库地址。')}
             </div>
 
             <div class="form-group">
@@ -401,8 +412,12 @@ async function submitProposal() {
     const denom = CONFIG.denom;
     const proposer = state.wallet.address;
 
-    // 构造 content Any
-    let contentAny;
+    // 构造 content Any（text / param 走 legacy content）
+    let contentAny = null;
+    let submitTypeUrl = '/cosmos.gov.v1beta1.MsgSubmitProposal';
+    let submitValue = null;
+    let v1Messages = null;
+
     if (type === 'text') {
       contentAny = PaxiCosmJS.Any.fromPartial({
         typeUrl: GOV_TYPE_URL.text,
@@ -414,28 +429,50 @@ async function submitProposal() {
         value: PaxiCosmJS.ParameterChangeProposal.encode({ title, description: desc, changes }).finish(),
       });
     } else {
-      // 社区池拨款：amount 为 upaxi 整数值（6 位精度）
+      // 社区池拨款：v1 gov 方式（与链上已通过的 #13 资助提案同构）
+      // messages = [ MsgCommunityPoolSpend{authority=gov模块账户, recipient, amount} ]
       const amountMicro = paxiToUpaxi(poolAmount.toFixed(6));
-      contentAny = PaxiCosmJS.Any.fromPartial({
-        typeUrl: GOV_TYPE_URL.pool,
-        value: PaxiCosmJS.CommunityPoolSpendProposal.encode({
-          title, description: desc, recipient: poolRecipient,
+      const spendMsg = PaxiCosmJS.Any.fromPartial({
+        typeUrl: GOV_V1_TYPE_URL.poolMsg,
+        value: PaxiCosmJS.MsgCommunityPoolSpend.encode({
+          authority: GOV_MODULE_ACCOUNT,
+          recipient: poolRecipient,
           amount: [{ denom, amount: amountMicro }],
         }).finish(),
       });
+      v1Messages = [spendMsg];
+      submitTypeUrl = GOV_V1_TYPE_URL.submitV1;
     }
 
     // MsgSubmitProposal
     const depositMicro = paxiToUpaxi(depositNum.toFixed(6));
-    const submitMsg = PaxiCosmJS.MsgSubmitProposal.fromPartial({
-      content: contentAny,
-      initialDeposit: [{ denom, amount: depositMicro }],
-      proposer,
-    });
+    const depositCoins = [{ denom, amount: depositMicro }];
+    let submitValueBytes;
+    if (v1Messages) {
+      // v1: { messages, initial_deposit, proposer, metadata, title, summary, expedited }
+      const summary = desc.length > 2000 ? desc.slice(0, 2000) : desc;
+      submitValueBytes = PaxiCosmJS.MsgSubmitProposalV1.encode({
+        messages: v1Messages,
+        initial_deposit: depositCoins,
+        proposer,
+        metadata: '',
+        title,
+        summary,
+        expedited: false,
+      }).finish();
+    } else {
+      const submitMsg = PaxiCosmJS.MsgSubmitProposal.fromPartial({
+        content: contentAny,
+        initialDeposit: depositCoins,
+        proposer,
+      });
+      submitValueBytes = PaxiCosmJS.MsgSubmitProposal.encode(submitMsg).finish();
+    }
+
     const messages = [
       PaxiCosmJS.Any.fromPartial({
-        typeUrl: '/cosmos.gov.v1beta1.MsgSubmitProposal',
-        value: PaxiCosmJS.MsgSubmitProposal.encode(submitMsg).finish(),
+        typeUrl: submitTypeUrl,
+        value: submitValueBytes,
       }),
     ];
 

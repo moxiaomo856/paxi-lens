@@ -25,6 +25,16 @@ let _nftvState = {
 const _nftvCache = {}; // key -> { tokens, infos, displays, ts }
 const _NFTV_CW721_CODE_ID = 2; // 所有 cw721 NFT 合约基于此 code_id 实例化
 let _nftvAllChain = []; // 全链模式：[{ contract, tokenId, display }]
+let _nftvLastMode = ''; // 最近一次查询模式：'single' | 'allchain'
+
+// 转移成功后刷新当前视图
+function loadCurrentNftView() {
+  if (_nftvLastMode === 'allchain') {
+    if (typeof _queryAllChainNfts === 'function') _queryAllChainNfts();
+  } else if (_nftvLastMode === 'single') {
+    if (typeof queryMyNfts === 'function') queryMyNfts();
+  }
+}
 
 // ============================================================
 // 渲染
@@ -151,6 +161,7 @@ async function queryMyNfts() {
   const statusEl = document.getElementById('nftvStatus');
   const resultsCard = document.getElementById('nftvResultsCard');
   _nftvState = { owner, contract, tokens: [], infos: {}, displays: {}, rendered: 0, loading: true };
+  _nftvLastMode = 'single';
 
   // 缓存命中
   const cacheKey = `${contract}:${owner}`;
@@ -291,6 +302,16 @@ function showNftDetail(tokenId, contract) {
         <h3 style="font-size:17px;margin-bottom:4px;">${escapeHtml(d.name || tokenId)}</h3>
         <div style="font-size:12px;color:var(--text-muted);">Token #${escapeHtml(tokenId)}</div>
       </div>
+
+      <!-- 发送 / 转移（图片下方直达） -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;margin-bottom:8px;">${t('myNfts.modalSendTitle')}</div>
+        <input type="text" id="nftvModalRecipient" placeholder="${t('myNfts.modalSendRecipientPH')}"
+          style="width:100%;margin-bottom:8px;font-family:var(--font-mono,monospace);font-size:12px;">
+        <button class="btn btn-chain btn-block" id="btnNftvModalTransfer">${t('myNfts.modalSendBtn')}</button>
+        <div class="status-msg" id="nftvModalStatus" style="margin-top:8px;"></div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.5;">${t('myNfts.modalSendHint')}</div>
+      </div>
       ${d.desc ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.6;">${escapeHtml(d.desc)}</div>` : ''}
       ${attrs.length ? `
         <div style="font-size:12px;font-weight:700;margin-bottom:6px;">${t('myNfts.attributes')}</div>
@@ -305,6 +326,24 @@ function showNftDetail(tokenId, contract) {
   `;
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
+
+  // 绑定弹窗内的发送/转移按钮
+  const btnModal = document.getElementById('btnNftvModalTransfer');
+  if (btnModal) {
+    btnModal.addEventListener('click', async () => {
+      const recipient = (document.getElementById('nftvModalRecipient')?.value || '').trim();
+      const statusEl = document.getElementById('nftvModalStatus');
+      if (!recipient) { showToast(t('myNfts.transferAddrInvalid'), 'warning'); return; }
+      await _doTransferNft({
+        contract: c,
+        tokenId,
+        recipient,
+        memo: '',
+        btn: btnModal,
+        statusEl,
+      });
+    });
+  }
 }
 
 // ============================================================
@@ -442,16 +481,25 @@ async function _transferNft() {
   const tokenId = (document.getElementById('nftvTransferTokenId')?.value || '').trim();
   const recipient = (document.getElementById('nftvTransferRecv')?.value || '').trim();
   const memo = (document.getElementById('nftvTransferMemo')?.value || '').trim();
+  const btn = document.getElementById('btnNftvTransfer');
+  const statusEl = document.getElementById('nftvTransferStatus');
+  await _doTransferNft({ contract, tokenId, recipient, memo, btn, statusEl });
+}
+
+// 通用转移逻辑（独立卡片入口 & 详情弹窗入口共用）
+async function _doTransferNft({ contract, tokenId, recipient, memo, btn, statusEl }) {
+  if (!state || !state.connected) { showToast(t('myNfts.transferNeedWallet'), 'error'); return; }
   if (!contract || !tokenId || !recipient) { showToast(t('myNfts.noContract'), 'warning'); return; }
   if (!_nftvValidAddr(contract)) { showToast(t('myNfts.transferAddrInvalid'), 'error'); return; }
   if (!_nftvValidAddr(recipient)) { showToast(t('myNfts.transferAddrInvalid'), 'error'); return; }
 
   if (!confirm(t('myNfts.transferConfirm') + '\n· Token: ' + tokenId + '\n· → ' + recipient)) return;
 
-  const btn = document.getElementById('btnNftvTransfer');
-  const statusEl = document.getElementById('nftvTransferStatus');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> ' + t('myNfts.transferring');
+  const oldBtnHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> ' + t('myNfts.transferring');
+  }
 
   try {
     const msg = PaxiCosmJS.MsgExecuteContract.fromPartial({
@@ -464,33 +512,42 @@ async function _transferNft() {
       typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
       value: PaxiCosmJS.MsgExecuteContract.encode(msg).finish(),
     })];
-    btn.innerHTML = '<span class="spinner"></span> ' + t('myNfts.transferring');
     const res = await buildSignAndBroadcast(messages, 'Transfer NFT ' + tokenId, memo || null, state.wallet);
     const txHash = res?.tx_response?.txhash;
     if (!txHash) throw new Error('Failed');
-    statusEl.className = 'status-msg info';
-    statusEl.style.display = 'block';
-    statusEl.innerHTML = `<strong>⏳ ${t('myNfts.transferring')}</strong><br><span style="font-size:11px">Tx: <code>${escapeHtml(txHash)}</code></span>`;
+    if (statusEl) {
+      statusEl.className = 'status-msg info';
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = `<strong>⏳ ${t('myNfts.transferring')}</strong><br><span style="font-size:11px">Tx: <code>${escapeHtml(txHash)}</code></span>`;
+    }
     const txResp = res?.tx_response || res;
     if (txResp.code !== undefined && txResp.code !== 0) throw new Error(txResp.raw_log || 'Failed');
     let pollRes = { success: true, height: null };
     if (typeof pollTxStatus === 'function') {
-      btn.innerHTML = '<span class="spinner"></span> ' + t('myNfts.transferring');
+      if (btn) btn.innerHTML = '<span class="spinner"></span> ' + t('myNfts.transferring');
       pollRes = await pollTxStatus(txHash, 25);
       if (!pollRes || !pollRes.confirmed || !pollRes.success) throw new Error(pollRes?.rawLog || 'Failed');
     }
-    statusEl.className = 'status-msg success';
-    statusEl.style.display = 'block';
-    statusEl.innerHTML = `<strong>${t('myNfts.transferSuccess')}</strong><br><span style="font-size:11px">Tx: <code style="word-break:break-all;font-size:11px">${escapeHtml(txHash)}</code></span>`;
+    if (statusEl) {
+      statusEl.className = 'status-msg success';
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = `<strong>${t('myNfts.transferSuccess')}</strong><br><span style="font-size:11px">Tx: <code style="word-break:break-all;font-size:11px">${escapeHtml(txHash)}</code></span>`;
+    }
     showToast(t('myNfts.transferSuccess'), 'success');
+    // 转移成功后刷新当前视图
+    setTimeout(() => { if (typeof loadCurrentNftView === 'function') loadCurrentNftView(); }, 2500);
   } catch (e) {
-    statusEl.className = 'status-msg error';
-    statusEl.style.display = 'block';
-    statusEl.innerHTML = `<strong>❌ ${t('myNfts.queryFail')}</strong><br>${escapeHtml(e.message || e)}`;
+    if (statusEl) {
+      statusEl.className = 'status-msg error';
+      statusEl.style.display = 'block';
+      statusEl.innerHTML = `<strong>❌ ${t('myNfts.queryFail')}</strong><br>${escapeHtml(e.message || e)}`;
+    }
     showToast(t('myNfts.queryFail'), 'error');
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = t('myNfts.transferBtn');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = oldBtnHtml;
+    }
   }
 }
 
@@ -519,6 +576,7 @@ async function _queryAllChainNfts() {
   if (statusEl) { statusEl.className = 'status-msg info'; statusEl.style.display = 'block'; statusEl.innerHTML = `<span class="spinner"></span> ${t('myNfts.allChainLoading')}`; }
   if (resultsCard) resultsCard.style.display = 'none';
   _nftvAllChain = [];
+  _nftvLastMode = 'allchain';
   try {
     const contracts = await _getAllCw721Contracts();
     if (!contracts.length) {

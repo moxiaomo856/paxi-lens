@@ -444,6 +444,56 @@
   };
 
   // ============================================================
+  // MsgCommunityPoolSpend 编码 — 社区池拨款消息（DAO 资助申请的真正执行方式）
+  // protobuf: cosmos.distribution.v1beta1.MsgCommunityPoolSpend
+  // { string authority = 1; string recipient = 2; repeated Coin amount = 3; }
+  // 注意：authority 必须是 gov module account（链上地址 paxi10d07y265gmmuvt4z0w9aw880jnsr700je7h2vr）
+  // ============================================================
+  const MsgCommunityPoolSpend = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const parts = [];
+      if (data.authority) parts.push(encodeLenDelim(1, data.authority));
+      if (data.recipient) parts.push(encodeLenDelim(2, data.recipient));
+      if (data.amount && Array.isArray(data.amount)) {
+        for (const coin of data.amount) {
+          parts.push(encodeLenDelim(3, encodeCoin(coin.denom, coin.amount)));
+        }
+      }
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
+  // MsgSubmitProposalV1 编码 — gov v1 提交提案（携带 messages）
+  // protobuf: cosmos.gov.v1.MsgSubmitProposal
+  // { repeated Any messages = 1; repeated Coin initial_deposit = 2; string proposer = 3;
+  //   string metadata = 4; string title = 5; string summary = 6; bool expedited = 7; }
+  // 与链上已通过的 #13 资助提案完全同构。
+  // ============================================================
+  const MsgSubmitProposalV1 = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const parts = [];
+      if (data.messages && Array.isArray(data.messages)) {
+        for (const m of data.messages) {
+          parts.push(encodeLenDelim(1, AnyEncode.encode(m).finish()));
+        }
+      }
+      const deposit = data.initial_deposit || data.initialDeposit || [];
+      for (const coin of deposit) {
+        parts.push(encodeLenDelim(2, encodeCoin(coin.denom, coin.amount)));
+      }
+      if (data.proposer) parts.push(encodeLenDelim(3, data.proposer));
+      if (data.metadata) parts.push(encodeLenDelim(4, data.metadata));
+      if (data.title) parts.push(encodeLenDelim(5, data.title));
+      if (data.summary) parts.push(encodeLenDelim(6, data.summary));
+      if (data.expedited) parts.push(encodeVarintField(7, 1));
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
   // 兼容层入口：检测并补充缺失的类
   // ============================================================
   function applyCompat() {
@@ -471,6 +521,8 @@
       ParamChange,
       ParameterChangeProposal,
       CommunityPoolSpendProposal,
+      MsgCommunityPoolSpend,
+      MsgSubmitProposalV1,
       MsgSubmitProposal,
     };
 
