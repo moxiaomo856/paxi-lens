@@ -1,8 +1,9 @@
 /**
  * 工具模块：治理提案 (Governance Proposal)
- * 支持两类提案：
+ * 支持三类提案：
  *  - 文本提案 (TextProposal)
  *  - 参数修改提案 (ParameterChangeProposal) — 可添加多条 subspace/key/value
+ *  - 社区池拨款提案 (CommunityPoolSpendProposal) — DAO 资助申请，从社区池拨款给收款地址
  * 服务费：SHARED_CONFIG.governance.submitFee（默认 50 PAXI）
  */
 if (!window.TOOL_REGISTRY) window.TOOL_REGISTRY = {};
@@ -10,6 +11,7 @@ if (!window.TOOL_REGISTRY) window.TOOL_REGISTRY = {};
 const GOV_TYPE_URL = {
   text: '/cosmos.gov.v1beta1.TextProposal',
   param: '/cosmos.params.v1beta1.ParameterChangeProposal',
+  pool: '/cosmos.distribution.v1beta1.CommunityPoolSpendProposal',
 };
 const GOV_STATUS = {
   0: { label: '未知', cls: 'warning' },
@@ -32,6 +34,29 @@ const GOV_PARAM_PRESETS = [
 
 function _t(k, fallback) { if (typeof t === 'function') { const v = t(k); return v && v !== k ? v : fallback; } return fallback; }
 
+// ===== bech32 地址校验（paxi1 前缀，账户 43 字符 / 合约 63 字符，含 checksum 验证）=====
+const _PROP_BECH32 = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+const _PROP_GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+function _isValidPaxiAddress(a) {
+  if (typeof a !== 'string') return false;
+  const s = a.trim();
+  const m = /^paxi1([qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38}|[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58})$/.exec(s);
+  if (!m) return false;
+  const hrp = [];
+  for (const c of 'paxi') hrp.push(c.charCodeAt(0) >> 5);
+  hrp.push(0);
+  for (const c of 'paxi') hrp.push(c.charCodeAt(0) & 31);
+  const data = [];
+  for (const c of m[1]) data.push(_PROP_BECH32.indexOf(c));
+  let chk = 1;
+  for (const v of hrp.concat(data)) {
+    const top = chk >> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ v;
+    for (let i = 0; i < 5; i++) if ((top >> i) & 1) chk ^= _PROP_GEN[i];
+  }
+  return chk === 1;
+}
+
 function govConfig() {
   return (typeof SHARED_CONFIG !== 'undefined' && SHARED_CONFIG.governance) || { submitFee: 50, defaultDeposit: 100 };
 }
@@ -42,6 +67,7 @@ function renderProposal() {
     <select id="proposalType" onchange="toggleProposalType(this.value)">
       <option value="text">${_t('proposal.typeText','文本提案')}</option>
       <option value="param">${_t('proposal.typeParam','参数修改提案')}</option>
+      <option value="pool">${_t('proposal.typePool','🏦 社区池拨款（DAO 资助申请）')}</option>
     </select>`;
   const paramSubL = _t('proposal.paramSubspace','参数模块 (subspace)');
   const paramKL  = _t('proposal.paramKey','参数名 (key)');
@@ -104,6 +130,31 @@ function renderProposal() {
           </div>
         </div>
 
+        <!-- 社区池拨款专属区域（默认隐藏） -->
+        <div id="proposalPoolBlock" style="display:none;margin-bottom:14px;">
+          <div style="padding:12px 14px;background:rgba(14,165,233,.08);border:1px dashed #0ea5e9;border-radius:var(--radius);">
+            <div style="font-weight:700;font-size:13px;margin-bottom:10px;">${_t('proposal.poolBlockTitle','🏦 社区池拨款配置 (CommunityPoolSpendProposal)')}</div>
+
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;line-height:1.6;">
+              ${_t('proposal.poolDesc','若提案通过，社区池将向以下收款地址划拨指定数量的 PAXI（DAO 资助申请）。')}
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">${_t('proposal.poolRecipient','收款地址 (recipient)')}</label>
+              <input type="text" id="proposalPoolRecipient" placeholder="paxi1...">
+            </div>
+
+            <div class="form-group" style="margin-bottom:8px;">
+              <label class="form-label">${_t('proposal.poolAmount','拨款金额 (PAXI)')}</label>
+              <input type="number" id="proposalPoolAmount" min="0" step="0.01" placeholder="150000">
+            </div>
+
+            <div style="font-size:11px;color:var(--text-muted);padding:8px 10px;background:var(--bg-card);border-radius:6px;" id="proposalPoolBalance">
+              ${_t('proposal.poolBalanceLoading','正在查询链上社区池余额...')}
+            </div>
+          </div>
+        </div>
+
         <div class="form-group">
           <label class="form-label">${_t('proposal.deposit','押金 (PAXI)')}</label>
           <input type="number" id="proposalDeposit" value="${cfg.defaultDeposit}" min="0" step="0.01">
@@ -162,8 +213,47 @@ function escapeAttr(s) { if (s == null) return ''; return String(s).replace(/"/g
 
 function toggleProposalType(val) {
   const box = document.getElementById('proposalParamBlock');
-  if (!box) return;
-  box.style.display = (val === 'param') ? 'block' : 'none';
+  if (box) box.style.display = (val === 'param') ? 'block' : 'none';
+  const poolBox = document.getElementById('proposalPoolBlock');
+  if (poolBox) {
+    poolBox.style.display = (val === 'pool') ? 'block' : 'none';
+    if (val === 'pool') loadCommunityPoolBalance();
+  }
+}
+
+// 查询链上社区池余额（只读，无费用）
+// ===== DecCoin 换算 =====
+// 社区池 community_pool 返回 DecCoin：amount 是 18 位小数的十进制字符串（单位=upaxi）
+// 例如 "5138152097007.919489561159935055" → 5138152097007 upaxi = 5138152.097007 PAXI
+// 注意：不能直接用 upaxiToPaxi（它只接受纯整数字符串，会因小数点而错位）
+function _decCoinToPaxi(amountStr) {
+  if (amountStr == null) return '0';
+  const s = String(amountStr).trim();
+  const dot = s.indexOf('.');
+  const intPart = dot >= 0 ? s.slice(0, dot) : s;
+  if (!/^\d+$/.test(intPart)) return '0';
+  return typeof upaxiToPaxi === 'function' ? upaxiToPaxi(intPart) : (parseInt(intPart, 10) / 1e6).toFixed(6);
+}
+
+async function loadCommunityPoolBalance() {
+  const el = document.getElementById('proposalPoolBalance');
+  if (!el) return;
+  try {
+    const lcd = typeof CONFIG !== 'undefined' ? CONFIG.lcd : getLCD();
+    const res = await fetch(`${lcd}/cosmos/distribution/v1beta1/community_pool`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const pool = (data.pool || []).find(c => c.denom === (CONFIG.denom || 'upaxi')) || (data.pool || [])[0];
+    if (!pool) {
+      el.innerHTML = _t('proposal.poolBalanceEmpty','社区池当前无余额');
+      return;
+    }
+    const paxi = _decCoinToPaxi(pool.amount);
+    el.innerHTML = _t('proposal.poolBalance','💰 链上社区池余额：') +
+      `<strong style="color:#0ea5e9;">${paxi} PAXI</strong>`;
+  } catch (e) {
+    el.innerHTML = _t('proposal.poolBalanceFail','社区池余额查询失败') + '：' + escapeHtmlSafe(e.message || String(e));
+  }
 }
 
 function addProposalParamRow() {
@@ -224,7 +314,7 @@ async function submitProposal() {
   const btn = document.getElementById('proposalSubmitBtn');
   if (!titleEl || !descEl || !depositEl || !typeEl) return;
 
-  const type = typeEl.value === 'param' ? 'param' : 'text';
+  const type = typeEl.value === 'param' ? 'param' : (typeEl.value === 'pool' ? 'pool' : 'text');
   const title = titleEl.value.trim();
   const desc = descEl.value.trim();
   const depositNum = parseFloat(depositEl.value) || 0;
@@ -241,6 +331,8 @@ async function submitProposal() {
   }
   // 参数校验
   let changes = [];
+  let poolRecipient = '';
+  let poolAmount = 0;
   if (type === 'param') {
     const rows = collectParamChanges();
     if (!rows.length) {
@@ -255,9 +347,49 @@ async function submitProposal() {
     }
     changes = rows.map(r => ({ subspace: r.sub, key: r.key, value: r.val }));
   }
+  if (type === 'pool') {
+    const rcvEl = document.getElementById('proposalPoolRecipient');
+    const amtEl = document.getElementById('proposalPoolAmount');
+    poolRecipient = (rcvEl?.value || '').trim();
+    poolAmount = parseFloat(amtEl?.value) || 0;
+    if (!poolRecipient) {
+      showStatus('proposalStatus', _t('proposal.poolNoRecipient','请填写收款地址'), 'warning');
+      return;
+    }
+    if (!_isValidPaxiAddress(poolRecipient)) {
+      showStatus('proposalStatus', _t('proposal.poolBadRecipient','收款地址格式不正确（paxi1...）'), 'error');
+      return;
+    }
+    if (!(poolAmount > 0)) {
+      showStatus('proposalStatus', _t('proposal.poolBadAmount','拨款金额必须大于 0'), 'warning');
+      return;
+    }
+    // 金额不得超过链上社区池余额
+    try {
+      const lcd = typeof CONFIG !== 'undefined' ? CONFIG.lcd : getLCD();
+      const res = await fetch(`${lcd}/cosmos/distribution/v1beta1/community_pool`);
+      if (res.ok) {
+        const data = await res.json();
+        const denom = CONFIG.denom || 'upaxi';
+        const pool = (data.pool || []).find(c => c.denom === denom) || (data.pool || [])[0];
+        if (pool) {
+          const poolPaxi = _decCoinToPaxi(pool.amount);
+          if (poolAmount > parseFloat(poolPaxi)) {
+            showStatus('proposalStatus',
+              _t('proposal.poolExceed','拨款金额超过链上社区池余额') + ` (${poolPaxi} PAXI)`, 'error');
+            return;
+          }
+        }
+      }
+    } catch (e) { /* 余额校验失败不阻塞提交，交由链上判定 */ }
+  }
 
-  const confirmMsg = _t('proposal.confirmSubmit','确认支付 {fee} PAXI 服务费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。')
-    .replace('{fee}', feeNum).replace('{deposit}', depositNum);
+  const confirmMsg = type === 'pool'
+    ? _t('proposal.confirmSubmitPool','确认提交社区池拨款提案（DAO 资助申请）？\n\n拨款金额：{amount} PAXI\n收款地址：{rcv}\n\n提案通过后社区池将向该地址划拨 {amount} PAXI。\n服务费 {fee} PAXI + 押金 {deposit} PAXI。')
+        .replace('{amount}', poolAmount).replace('{rcv}', poolRecipient)
+        .replace('{fee}', feeNum).replace('{deposit}', depositNum)
+    : _t('proposal.confirmSubmit','确认支付 {fee} PAXI 服务费 + {deposit} PAXI 押金提交提案？押金如通过将退还给您。')
+        .replace('{fee}', feeNum).replace('{deposit}', depositNum);
   if (!confirm(confirmMsg)) return;
 
   const oldText = btn.innerHTML;
@@ -276,10 +408,20 @@ async function submitProposal() {
         typeUrl: GOV_TYPE_URL.text,
         value: PaxiCosmJS.TextProposal.encode({ title, description: desc }).finish(),
       });
-    } else {
+    } else if (type === 'param') {
       contentAny = PaxiCosmJS.Any.fromPartial({
         typeUrl: GOV_TYPE_URL.param,
         value: PaxiCosmJS.ParameterChangeProposal.encode({ title, description: desc, changes }).finish(),
+      });
+    } else {
+      // 社区池拨款：amount 为 upaxi 整数值（6 位精度）
+      const amountMicro = paxiToUpaxi(poolAmount.toFixed(6));
+      contentAny = PaxiCosmJS.Any.fromPartial({
+        typeUrl: GOV_TYPE_URL.pool,
+        value: PaxiCosmJS.CommunityPoolSpendProposal.encode({
+          title, description: desc, recipient: poolRecipient,
+          amount: [{ denom, amount: amountMicro }],
+        }).finish(),
       });
     }
 
@@ -312,7 +454,8 @@ async function submitProposal() {
       }));
     }
 
-    const summary = `[${type === 'text' ? 'Text' : 'ParamChange'} Proposal] ${title.substring(0, 40)}`;
+    const typeTag = type === 'text' ? 'Text' : (type === 'param' ? 'ParamChange' : 'CommunityPoolSpend');
+    const summary = `[${typeTag} Proposal] ${title.substring(0, 40)}`;
     const res = await buildSignAndBroadcast(messages, summary, null, state.wallet);
 
     // 检查广播结果 — 结构是 { tx_response: { txhash, code, raw_log } } 或 { txhash, code, raw_log }
@@ -675,6 +818,31 @@ function normalizeProposal(p) {
     _raw: p,
   };
 }
+// 从 content 提取提案类型（用于列表徽章）
+function proposalTypeTag(p) {
+  const c = p?.content || p?._raw?.content || null;
+  let typeUrl = '';
+  if (c) {
+    if (typeof c === 'string') typeUrl = c;
+    else if (c['@type']) typeUrl = c['@type'];
+    else if (c.type_url || c.typeUrl) typeUrl = c.type_url || c.typeUrl;
+  }
+  if (!typeUrl) return null;
+  if (typeUrl.includes('CommunityPoolSpend')) {
+    return { label: _t('proposal.badgePool','🏦 社区池拨款'), color: '#0ea5e9', bg: 'rgba(14,165,233,.15)' };
+  }
+  if (typeUrl.includes('ParameterChange')) {
+    return { label: _t('proposal.badgeParam','🔧 参数修改'), color: '#f59e0b', bg: 'rgba(245,158,11,.15)' };
+  }
+  if (typeUrl.includes('Text')) {
+    return { label: _t('proposal.badgeText','📝 文本'), color: 'var(--primary)', bg: 'rgba(88,101,242,.15)' };
+  }
+  if (typeUrl.includes('SoftwareUpgrade')) {
+    return { label: _t('proposal.badgeUpgrade','⬆️ 软件升级'), color: '#22c55e', bg: 'rgba(34,197,94,.15)' };
+  }
+  return { label: typeUrl.split('.').pop(), color: 'var(--text-muted)', bg: 'rgba(255,255,255,.08)' };
+}
+
 function extractProposalTitle(p) {
   try {
     if (p.content) {
@@ -820,6 +988,7 @@ async function loadProposalList() {
             ${statusBadge}
           </div>
           <div style="font-size:13px;font-weight:600;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtmlSafe(p.title)}</div>
+          ${(() => { const tag = proposalTypeTag(p); return tag ? `<div style="margin-bottom:6px;"><span style="padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600;background:${tag.bg};color:${tag.color};">${escapeHtmlSafe(tag.label)}</span></div>` : ''; })()}
           <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-muted);margin-bottom:4px;">
             <span>💰 ${deposit}</span>
             <span>📅 ${formatTimeSafe(time)}</span>

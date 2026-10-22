@@ -422,6 +422,28 @@
   };
 
   // ============================================================
+  // CommunityPoolSpendProposal 编码 — 社区池拨款提案（DAO 资助申请）
+  // protobuf: cosmos.distribution.v1beta1.CommunityPoolSpendProposal
+  // { string title = 1; string description = 2; string recipient = 3; repeated Coin amount = 4; }
+  // ============================================================
+  const CommunityPoolSpendProposal = {
+    fromPartial(data) { return data; },
+    encode(data) {
+      const parts = [
+        encodeLenDelim(1, data.title || ''),
+        encodeLenDelim(2, data.description || ''),
+        encodeLenDelim(3, data.recipient || ''),
+      ];
+      if (data.amount && Array.isArray(data.amount)) {
+        for (const coin of data.amount) {
+          parts.push(encodeLenDelim(4, encodeCoin(coin.denom, coin.amount)));
+        }
+      }
+      return { finish: () => concatBytes(...parts) };
+    },
+  };
+
+  // ============================================================
   // 兼容层入口：检测并补充缺失的类
   // ============================================================
   function applyCompat() {
@@ -448,6 +470,7 @@
       TextProposal,
       ParamChange,
       ParameterChangeProposal,
+      CommunityPoolSpendProposal,
       MsgSubmitProposal,
     };
 
