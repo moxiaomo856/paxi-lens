@@ -537,7 +537,19 @@ async function _queryAllChainNfts() {
     }
     if (statusEl) statusEl.innerHTML = `<span class="spinner"></span> ${t('myNfts.loadingMeta')} (${items.length})`;
     const infos = await _queryBatch((it) => _queryNftInfo(it.contract, it.tokenId), items, _NFTV_CONCURRENCY);
-    items.forEach((it, i) => { it.display = _resolveDisplay(infos[i] || {}, null); });
+    items.forEach((it, i) => { it.info = infos[i] || {}; it.display = _resolveDisplay(it.info, null); });
+
+    // 对缺少图片/名称的 token，从 token_uri（含 base64 JSON）拉取元数据
+    const needMeta = items.filter(it => {
+      const ext = it.info?.extension || {};
+      return (!ext.image && !ext.name && it.info?.token_uri);
+    });
+    if (needMeta.length) {
+      if (statusEl) statusEl.innerHTML = `<span class="spinner"></span> ${t('myNfts.loadingMeta')} (${needMeta.length}/${items.length})`;
+      const metas = await _queryBatch((it) => fetchTokenUriMetadata(it.info.token_uri, _NFTV_META_TIMEOUT), needMeta, _NFTV_CONCURRENCY);
+      needMeta.forEach((it, i) => { it.display = _resolveDisplay(it.info, metas[i]); });
+    }
+
     _nftvAllChain = items;
     _renderAllChainResults(items, contracts.length);
   } catch (e) {
