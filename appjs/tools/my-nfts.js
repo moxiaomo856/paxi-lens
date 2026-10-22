@@ -59,7 +59,9 @@ function renderMyNfts() {
       </div>
 
       <button class="btn btn-primary btn-block" id="btnNftvQuery">${t('myNfts.query')}</button>
-      <button class="btn btn-outline btn-block" id="btnNftvAllChain" ${(state && state.connected) ? '' : 'disabled'} style="margin-top:10px;">${t('myNfts.allChainBtn')}</button>
+      <div class="btn-hint">${t('myNfts.queryHint')}</div>
+      <button class="btn btn-chain btn-block" id="btnNftvAllChain" ${(state && state.connected) ? '' : 'disabled'} style="margin-top:14px;">${t('myNfts.allChainBtn')}</button>
+      <div class="btn-hint">${t('myNfts.allChainHint')}</div>
       <div class="status-msg" id="nftvStatus"></div>
     </div>
 
