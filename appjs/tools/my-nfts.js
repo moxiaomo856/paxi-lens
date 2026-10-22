@@ -23,6 +23,8 @@ let _nftvState = {
   loading: false,
 };
 const _nftvCache = {}; // key -> { tokens, infos, displays, ts }
+const _NFTV_CW721_CODE_ID = 2; // 所有 cw721 NFT 合约基于此 code_id 实例化
+let _nftvAllChain = []; // 全链模式：[{ contract, tokenId, display }]
 
 // ============================================================
 // 渲染
@@ -57,6 +59,7 @@ function renderMyNfts() {
       </div>
 
       <button class="btn btn-primary btn-block" id="btnNftvQuery">${t('myNfts.query')}</button>
+      <button class="btn btn-outline btn-block" id="btnNftvAllChain" ${(state && state.connected) ? '' : 'disabled'} style="margin-top:10px;">${t('myNfts.allChainBtn')}</button>
       <div class="status-msg" id="nftvStatus"></div>
     </div>
 
@@ -109,6 +112,9 @@ function bindMyNftsEvents() {
     const btnQuery = document.getElementById('btnNftvQuery');
     if (btnQuery) btnQuery.addEventListener('click', queryMyNfts);
 
+    const btnAllChain = document.getElementById('btnNftvAllChain');
+    if (btnAllChain) btnAllChain.addEventListener('click', _queryAllChainNfts);
+
     const btnTransfer = document.getElementById('btnNftvTransfer');
     if (btnTransfer) btnTransfer.addEventListener('click', _transferNft);
 
@@ -122,7 +128,7 @@ function bindMyNftsEvents() {
     const grid = document.getElementById('nftvGrid');
     if (grid) grid.addEventListener('click', (e) => {
       const card = e.target.closest('.nft-card[data-token-id]');
-      if (card) showNftDetail(card.dataset.tokenId);
+      if (card) showNftDetail(card.dataset.tokenId, card.dataset.contract);
     });
   }, 100);
 }
@@ -258,8 +264,13 @@ function _renderNftCard(tokenId, display) {
 // ============================================================
 // 详情弹窗
 // ============================================================
-function showNftDetail(tokenId) {
-  const d = _nftvState.displays[tokenId] || {};
+function showNftDetail(tokenId, contract) {
+  let d = _nftvState.displays[tokenId] || {};
+  let c = contract || _nftvState.contract;
+  if (contract && _nftvAllChain.length) {
+    const it = _nftvAllChain.find(x => x.tokenId === tokenId && x.contract === contract);
+    if (it) { d = it.display || {}; c = it.contract; }
+  }
   const imgSrc = safeNftImgSrc(d.image);
   const attrs = d.attrs || [];
   const existing = document.getElementById('nftvModal');
@@ -285,7 +296,7 @@ function showNftDetail(tokenId) {
           ${attrs.map(a => `<div style="background:var(--bg);border-radius:6px;padding:6px 8px;font-size:11px;"><div style="color:var(--text-muted);font-size:10px;">${escapeHtml(a.trait_type || '')}</div><div style="font-weight:600;">${escapeHtml(String(a.value ?? ''))}</div></div>`).join('')}
         </div>` : ''}
       <div style="border-top:1px solid var(--border);padding-top:10px;font-size:11px;color:var(--text-muted);line-height:1.8;word-break:break-all;">
-        <div><strong>${t('myNfts.contractAddr')}:</strong><br><code style="word-break:break-all;color:var(--primary)">${escapeHtml(_nftvState.contract)}</code></div>
+        <div><strong>${t('myNfts.contractAddr')}:</strong><br><code style="word-break:break-all;color:var(--primary)">${escapeHtml(c)}</code></div>
         ${d.tokenUri ? `<div style="margin-top:6px;"><strong>${t('myNfts.tokenUri')}:</strong><br><code style="word-break:break-all;font-size:10px;">${escapeHtml(d.tokenUri)}</code></div>` : ''}
       </div>
     </div>
@@ -298,18 +309,32 @@ function showNftDetail(tokenId) {
 // 导出 CSV
 // ============================================================
 function exportNftsCsv() {
-  const rows = [[t('myNfts.tokenId'), t('myNfts.name'), t('myNfts.image'), t('myNfts.attributes')]];
-  for (const tokenId of _nftvState.tokens) {
-    const d = _nftvState.displays[tokenId] || {};
-    const attrsStr = (d.attrs || []).map(a => `${a.trait_type || ''}=${a.value ?? ''}`).join('; ');
-    rows.push([tokenId, d.name || '', d.image || '', attrsStr]);
+  let rows, items, fileTag;
+  if (_nftvAllChain.length) {
+    rows = [[t('myNfts.contractAddr'), t('myNfts.tokenId'), t('myNfts.name'), t('myNfts.image'), t('myNfts.attributes')]];
+    items = _nftvAllChain;
+    fileTag = 'allchain';
+    for (const it of items) {
+      const d = it.display || {};
+      const attrsStr = (d.attrs || []).map(a => `${a.trait_type || ''}=${a.value ?? ''}`).join('; ');
+      rows.push([it.contract, it.tokenId, d.name || '', d.image || '', attrsStr]);
+    }
+  } else {
+    rows = [[t('myNfts.tokenId'), t('myNfts.name'), t('myNfts.image'), t('myNfts.attributes')]];
+    items = _nftvState.tokens;
+    fileTag = _nftvState.contract.slice(0, 10);
+    for (const tokenId of items) {
+      const d = _nftvState.displays[tokenId] || {};
+      const attrsStr = (d.attrs || []).map(a => `${a.trait_type || ''}=${a.value ?? ''}`).join('; ');
+      rows.push([tokenId, d.name || '', d.image || '', attrsStr]);
+    }
   }
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `nfts-${_nftvState.contract.slice(0, 10)}-${Date.now()}.csv`;
+  a.download = `nfts-${fileTag}-${Date.now()}.csv`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -465,6 +490,95 @@ async function _transferNft() {
     btn.disabled = false;
     btn.innerHTML = t('myNfts.transferBtn');
   }
+}
+
+// ============ ALL-CHAIN NFT (code_id=2) ============
+async function _getAllCw721Contracts() {
+  const list = [];
+  let key = null;
+  while (true) {
+    const qs = key ? `?pagination.key=${encodeURIComponent(key)}&pagination.limit=100` : '?pagination.limit=100';
+    const res = await fetch(`${CONFIG.lcd}/cosmwasm/wasm/v1/code/${_NFTV_CW721_CODE_ID}/contracts${qs}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.contracts) list.push(...data.contracts);
+    const nk = data.pagination?.next_key;
+    if (!nk) break;
+    key = nk;
+  }
+  return list;
+}
+
+async function _queryAllChainNfts() {
+  if (!state || !state.connected) { showToast(t('myNfts.allChainNeedWallet'), 'error'); return; }
+  const owner = state.wallet.address;
+  const statusEl = document.getElementById('nftvStatus');
+  const resultsCard = document.getElementById('nftvResultsCard');
+  if (statusEl) { statusEl.className = 'status-msg info'; statusEl.style.display = 'block'; statusEl.innerHTML = `<span class="spinner"></span> ${t('myNfts.allChainLoading')}`; }
+  if (resultsCard) resultsCard.style.display = 'none';
+  _nftvAllChain = [];
+  try {
+    const contracts = await _getAllCw721Contracts();
+    if (!contracts.length) {
+      if (statusEl) { statusEl.className = 'status-msg info'; statusEl.style.display = 'block'; statusEl.textContent = t('myNfts.allChainEmpty'); }
+      if (resultsCard) resultsCard.style.display = 'none';
+      return;
+    }
+    const perContract = await _queryBatch(
+      (ct) => _queryAllTokens(ct, owner).then(ids => ({ ct, ids })).catch(() => ({ ct, ids: [] })),
+      contracts, 5
+    );
+    const items = [];
+    for (const r of perContract) for (const id of (r.ids || [])) items.push({ contract: r.ct, tokenId: id });
+    if (!items.length) {
+      if (statusEl) { statusEl.className = 'status-msg info'; statusEl.style.display = 'block'; statusEl.textContent = t('myNfts.allChainEmpty'); }
+      if (resultsCard) resultsCard.style.display = 'none';
+      return;
+    }
+    if (statusEl) statusEl.innerHTML = `<span class="spinner"></span> ${t('myNfts.loadingMeta')} (${items.length})`;
+    const infos = await _queryBatch((it) => _queryNftInfo(it.contract, it.tokenId), items, _NFTV_CONCURRENCY);
+    items.forEach((it, i) => { it.display = _resolveDisplay(infos[i] || {}, null); });
+    _nftvAllChain = items;
+    _renderAllChainResults(items, contracts.length);
+  } catch (e) {
+    if (statusEl) { statusEl.className = 'status-msg error'; statusEl.style.display = 'block'; statusEl.innerHTML = `<strong>❌ ${t('myNfts.queryFail')}</strong><br>${escapeHtml(e.message || e)}`; }
+  }
+}
+
+function _renderAllChainResults(items, contractCount) {
+  const statusEl = document.getElementById('nftvStatus');
+  if (statusEl) statusEl.style.display = 'none';
+  const resultsCard = document.getElementById('nftvResultsCard');
+  if (resultsCard) resultsCard.style.display = 'block';
+  const summary = document.getElementById('nftvSummary');
+  if (summary) summary.innerHTML = t('myNfts.allChainCount').replace('{n}', contractCount).replace('{m}', items.length);
+  const grid = document.getElementById('nftvGrid');
+  if (grid) grid.innerHTML = items.map(_renderAllChainCard).join('');
+  const wrap = document.getElementById('nftvLoadMoreWrap');
+  if (wrap) wrap.style.display = 'none';
+  const btnExport = document.getElementById('btnNftvExport');
+  if (btnExport) btnExport.style.display = items.length ? 'inline-flex' : 'none';
+}
+
+function _renderAllChainCard(item) {
+  const d = item.display || {};
+  const imgSrc = safeNftImgSrc(d.image);
+  const attrs = d.attrs || [];
+  const name = d.name || item.tokenId;
+  const shortC = item.contract.slice(0, 8) + '...' + item.contract.slice(-4);
+  return `
+    <div class="nft-card" data-token-id="${escapeHtml(item.tokenId)}" data-contract="${escapeHtml(item.contract)}" style="cursor:pointer;">
+      <div class="nft-card-img">
+        <div class="nft-card-placeholder" style="display:${imgSrc ? 'none' : 'flex'};">🎨</div>
+        ${imgSrc ? `<img src="${imgSrc}" loading="lazy" onerror="this.style.display='none';this.previousElementSibling.style.display='flex';">` : ''}
+      </div>
+      <div class="nft-card-body">
+        <div class="nft-card-name">${escapeHtml(name)}</div>
+        <div class="nft-card-meta">Token #${escapeHtml(item.tokenId)}</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px;word-break:break-all;">${escapeHtml(shortC)}</div>
+      </div>
+    </div>
+  `;
 }
 
 window.TOOL_REGISTRY['my-nfts'] = {

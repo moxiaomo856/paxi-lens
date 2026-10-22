@@ -235,7 +235,12 @@ const LANG = {
       transferSuccess: '✅ 转移成功',
       transferAddrInvalid: '地址格式不正确（paxi1 开头，账户 43 位或合约 63 位）',
       transferNeedWallet: '请先连接钱包',
-      transferring: '转移中...'
+      transferring: '转移中...',
+      allChainBtn: '🌐 查看我全链 NFT',
+      allChainLoading: '正在枚举全链 cw721 合约并查询持有情况...',
+      allChainEmpty: '该地址在所有 cw721 合约（code_id=2）中暂无 NFT',
+      allChainCount: '覆盖 {n} 个合约 · 共 {m} 个 NFT',
+      allChainNeedWallet: '请先连接钱包以查看全链 NFT'
     },
     games: {
       title: '🎮 游戏娱乐',
@@ -563,7 +568,12 @@ const LANG = {
       transferSuccess: '✅ Transfer successful',
       transferAddrInvalid: 'Invalid address (paxi1..., 43 chars account or 63 chars contract)',
       transferNeedWallet: 'Please connect wallet first',
-      transferring: 'Transferring...'
+      transferring: 'Transferring...',
+      allChainBtn: '🌐 View my all-chain NFTs',
+      allChainLoading: 'Enumerating all-chain cw721 contracts and querying holdings...',
+      allChainEmpty: 'This address has no NFT on any cw721 contract (code_id=2)',
+      allChainCount: 'Covering {n} contracts · {m} NFTs total',
+      allChainNeedWallet: 'Please connect wallet first to view all-chain NFTs'
     },
     games: {
       title: '🎮 Game Center',
