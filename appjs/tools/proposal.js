@@ -224,7 +224,7 @@ function renderDaoProposalCard() {
 
       <div class="form-group">
         <label class="form-label">${_t('proposal.daoLabelTitle','提案标题')}</label>
-        <input type="text" id="daoPropTitle" placeholder="${_t('proposal.daoTitlePlaceholder','例如：Paxi 棋阁上线与三个月运维资助 (150,000 PAXI)')}">
+        <input type="text" id="daoPropTitle" placeholder="${_t('proposal.daoTitlePlaceholder','例如：Paxi Lens 上线与六个月运维资助 (300,000 PAXI)')}">
       </div>
 
       <div class="form-group">
@@ -244,7 +244,7 @@ function renderDaoProposalCard() {
 
       <div class="form-group" style="margin-bottom:8px;">
         <label class="form-label">${_t('proposal.poolAmount','拨款金额 (PAXI)')}</label>
-        <input type="number" id="daoPropAmount" min="0" step="0.01" placeholder="150000">
+        <input type="number" id="daoPropAmount" min="0" step="0.01" placeholder="300000">
       </div>
 
       <div style="font-size:11px;color:var(--text-muted);padding:8px 10px;background:var(--bg-card);border-radius:6px;margin-bottom:12px;" id="daoPropBalance">

@@ -9,7 +9,7 @@
  * 另外校验：
  *   - 白名单 4 个地址的 bech32 checksum
  *   - 链上 gov module account 与代码中硬编码一致
- *   - 链上社区池余额可读、150,000 PAXI 在余额范围内
+ *   - 链上社区池余额可读、300,000 PAXI 在余额范围内
  *
  * 运行：node test/verify-dao-submit.js
  */
@@ -116,7 +116,7 @@ const WHITELIST = [
   'paxi1fl8j6gewhs2yz3tztr5dlvsmpp0d7gaxka73e5',
 ];
 const RECIPIENT = 'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd';
-const AMOUNT_PAXI = 150000;
+const AMOUNT_PAXI = 300000;
 const AMOUNT_MICRO = String(AMOUNT_PAXI * 1e6);
 
 function buildDaoProposalAny({ amountMicro = AMOUNT_MICRO, recipient = RECIPIENT, proposer = RECIPIENT, depositMicro = '100000000' } = {}) {
@@ -135,8 +135,8 @@ function buildDaoProposalAny({ amountMicro = AMOUNT_MICRO, recipient = RECIPIENT
       initial_deposit: [{ denom: DENOM, amount: depositMicro }],
       proposer,
       metadata: '',
-      title: 'Paxi 棋阁上线与三个月运维资助 (150,000 PAXI)',
-      summary: '申请 150,000 PAXI 用于 Paxi 棋阁上线与三个月运维。',
+      title: 'Paxi Lens 上线与六个月运维资助 (300,000 PAXI)',
+      summary: '申请 300,000 PAXI 用于 Paxi Lens 上线与六个月运维。',
       expedited: false,
     }),
   };
@@ -190,7 +190,7 @@ function buildDaoProposalAny({ amountMicro = AMOUNT_MICRO, recipient = RECIPIENT
   }
 
   console.log('\n== 构造 DAO 资助申请并 simulate ==');
-  const good = await simulate('DAO 资助申请（150,000 PAXI，v1 方式）', [buildDaoProposalAny()]);
+  const good = await simulate('DAO 资助申请（300,000 PAXI，v1 方式）', [buildDaoProposalAny()]);
   check(good.gas > 5000 && good.signCheck && !good.unresolved, 'v1 编码被链上正确解析（走通至签名校验）');
 
   // 负向对照：错误的 MsgCommunityPoolSpend typeUrl

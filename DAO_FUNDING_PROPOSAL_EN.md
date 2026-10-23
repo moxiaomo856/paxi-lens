@@ -1,16 +1,16 @@
-# Paxi Pro Suite · Official DAO Funding Proposal (256,000 PAXI)
+# Paxi Lens · Official DAO Funding Proposal (300,000 PAXI)
 
-> Purpose: Apply to the Paxi DAO community pool for **256,000 PAXI** to deliver and operate the "Paxi on-chain data layer + non-custodial toolkit".
-> Status: **Final draft** — amount structure decided (120k delivered v1 + 100k new features + 36k operations).
-> Supporting materials: `AUDIT_REPORT.md` (security & compliance audit), `ARCHITECTURE_256K.md` (full architecture & dev plan), `ROADMAP.md`, `LICENSE` (MIT), `DAO_FUNDING_PROPOSAL.md` (Chinese version).
+> Purpose: Apply to the Paxi DAO community pool for **300,000 PAXI** to deliver and operate the Paxi Lens on-chain data layer + non-custodial toolkit (one-time lump-sum grant; tool launch plus developer funding).
+> Status: **Draft** — one-time lump-sum 300,000 PAXI (development 282,000 + operations 18,000 / 6 months).
+> Supporting materials: `ARCHITECTURE.md` (full architecture & dev plan), `ARCHITECTURE_DIAGRAM.svg` (architecture diagram), `ROADMAP.md`, `LICENSE` (MIT), `DAO_FUNDING_PROPOSAL.md` (Chinese version).
 
 ---
 
 ## 1. Title
-**Paxi Pro Suite — The Paxi On-Chain Data Layer & Non-Custodial Toolkit. Applying for 256,000 PAXI from the Paxi DAO Community Pool**
+**Paxi Lens — The Paxi On-Chain Data Layer & Non-Custodial Toolkit. Applying for 300,000 PAXI (one-time lump-sum) from the Paxi DAO Community Pool**
 
 ## 2. Abstract
-Paxi Pro Suite is a **pure front-end, non-custodial** toolkit for the Paxi ecosystem. All 20 tools are live (MIT public repository `moxiaomo856/paxi-toolbox`, full commit history, security audit passed): decoder, token issuance, Swap helper (native AMM), allowance manager, burning, redelegation, governance proposals/voting, delegation, batch transfers, IBC queries, tx dry-run and more. **Private keys and funds never leave the user's wallet.** This grant of 256,000 PAXI funds: ① the continued availability and official integration of the delivered v1; ② building the **public read-only data layer** the chain currently lacks — whale tracking, large-tx feed, new-contract radar with contract safety checks, governance participation dashboard, and validator transparency; ③ 12 months of operations. All tool service fees go 100% to a single transparent address `paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd`; **no prize pools, contracts hold no user funds, and no tool touches TKCC**.
+Paxi Lens is a **pure front-end, non-custodial** toolkit for the Paxi ecosystem. All 20 tools are live (MIT public repository `moxiaomo856/paxi-lens`, full commit history): decoder, token issuance, Swap helper (native AMM), allowance manager, burning, redelegation, governance proposals/voting, delegation, batch transfers, IBC queries, tx dry-run and more. **Private keys and funds never leave the user's wallet.** This grant of 300,000 PAXI (one-time lump-sum payment; the DAO disburses in a single tranche, and any further funding requires a new proposal) funds the launch of the toolkit plus developer funding: ① the official integration, maintenance and continued availability of the delivered v1; ② building the **public read-only data layer** the chain currently lacks — whale tracking, large-tx feed, new-contract radar with contract safety checks, governance participation dashboard, and validator transparency; ③ 6 months of operations. All tool service fees go 100% to a single transparent address `paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd`; **no prize pools, contracts hold no user funds, and no tool touches TKCC**.
 
 ## 3. Problem Statement
 - New users lack a **unified, trustworthy, non-custodial** entry point for Paxi; governance participation is hard.
@@ -31,9 +31,8 @@ Paxi Pro Suite is a **pure front-end, non-custodial** toolkit for the Paxi ecosy
 1. Deployable pure front-end dApp (20 tools + 7 data applications, zh/en i18n).
 2. Open-source `paxi-data` service: scanner + indexer + public API + replay tests (reproducibility evidence).
 3. Single-fee-collector integration with pre-signature fee/receiver disclosure.
-4. README + architecture diagram + 2–3 min demo video.
-5. `AUDIT_REPORT.md` + declaration-collision guard tests.
-6. Public GitHub repositories (MIT, with commit history/releases/OpenAPI docs).
+4. README + architecture diagram.
+5. Public GitHub repositories (MIT, with commit history/releases/OpenAPI docs).
 
 ## 6. Milestones (~18 weeks)
 - **M1 (wk 1–2) · Data service v1**: Block Scanner + SQLite + /healthz + replay tests. Acceptance: catch-up scan ≤5 min behind; replay matches on-chain sampling.
@@ -43,13 +42,16 @@ Paxi Pro Suite is a **pure front-end, non-custodial** toolkit for the Paxi ecosy
 - **M5 (wk 14–18) · Public API docs + weekly-report automation + SDK self-hosting & SRI**. Acceptance: OpenAPI published; weekly report auto-generated.
 - Throughout: weekly releases, monthly fund-usage reports (on-chain verifiable).
 
-## 7. Budget Breakdown (final · 256,000 PAXI)
+## 7. Budget Breakdown (final · 300,000 PAXI)
 | Item | Amount (PAXI) | Share | Notes |
 |------|--------------|-------|-------|
-| Delivered v1 (20 tools) | 120,000 | 47% | Security audit, ongoing maintenance, official integration, docs & i18n, long-term availability |
-| New features | 100,000 | 39% | Data service ~40k + front-end data apps ~45k + testing & security ~15k |
-| Operations | 36,000 | 14% | Scanner VPS 12 months + weekly/monthly report content ops + community + contingency |
-| **Total** | **256,000** | 100% | |
+| Dev · Delivered v1 official integration & maintenance | 120,000 | 40% | Deep-link integration / official PR collaboration / docs & i18n / long-term availability (no repeat payment for what's built) |
+| Dev · Data service layer | 50,000 | 16.7% | Block scanner + SQLite index + public read-only REST API (open-source, takeover-ready) |
+| Dev · Data application front-end | 60,000 | 20% | Whale tracker / large-tx feed / contract radar / safety check / governance dashboard / validator transparency / overview — 7 apps |
+| Dev · Testing & security hardening | 30,000 | 10% | SDK self-hosting + SRI + declaration-collision guard + replay tests (closes known risks) |
+| Dev · i18n expansion & community | 22,000 | 7.3% | ko/ru/es expansion + weekly/monthly report content ops |
+| Operations · 6 months | 18,000 | 6% | Scanner VPS 6 months + monthly fund-usage reports + community + contingency |
+| **Total** | **300,000** | 100% | |
 
 ## 8. KPIs
 - ≥ **500** monthly active wallets;
@@ -59,7 +61,7 @@ Paxi Pro Suite is a **pure front-end, non-custodial** toolkit for the Paxi ecosy
 - Data layer: ≥ **2,000** monthly visits across whale/feed/dashboards; **3+** monthly fund-usage reports (on-chain verifiable).
 
 ## 9. Risks & Mitigation
-- **Key/fund safety**: non-custodial architecture, signing inside the wallet (audit-confirmed, no keys stored).
+- **Key/fund safety**: non-custodial architecture, signing inside the wallet by design, no keys stored.
 - **Data trustworthiness**: read-only indexing + full replay scripts — anyone can reproduce; official takeover-ready.
 - **Service continuity**: single VPS + PM2 + health-check alerts; the front end degrades to direct LCD queries, so tool core functions survive data-service outages.
 - **Compliance**: whale ranks / safety checks / yield simulations are data presentation with disclaimers; zero TKCC; no prize pools.
@@ -69,12 +71,12 @@ Paxi Pro Suite is a **pure front-end, non-custodial** toolkit for the Paxi ecosy
 1. **Service fees (Decision A — retained)**: all fees flow to the single transparent address. Wording: *"Service fees are part of the sustainable operating model; DAO funding buys the public goods that fees cannot justify — the data layer, governance tooling, official integration, documentation. Neither replaces the other."*
 2. **Data service layer (fully disclosed)**: the Block Scanner is an open, read-only, takeover-ready component; its costs are budgeted under operations; non-custodial, holds no keys.
 3. **Collector address**: `paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd` is the applicant-operated treasury — on-chain verifiable, monthly flow disclosure; DAO grant funds are managed at the same address.
-4. **Materials**: audit report ✅ · architecture doc ✅ · roadmap ✅ · LICENSE ✅ · bilingual proposal ✅; TODO: architecture diagram, demo video.
+4. **Materials**: architecture doc ✅ · architecture diagram ✅ (`ARCHITECTURE_DIAGRAM.svg`) · roadmap ✅ · LICENSE ✅ · bilingual proposal ✅.
 
 ## 11. Transparency Declaration
 > **Service fees are transparently disclosed; no prize pools; contracts hold no user funds; no tool touches TKCC.** 100% of tool service fees go to the single address `paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd` — on-chain verifiable, no intermediary accounts, no diversion. DAO grant funds are managed at the same address with monthly public flow reports. The data service layer is read-only, open-source, and takeover-ready.
 
-## 12. Roadmap (see `ROADMAP.md` and `ARCHITECTURE_256K.md`)
+## 12. Roadmap (see `ROADMAP.md` and `ARCHITECTURE.md`)
 - **Phase 1 (data foundation)**: scanner v1 → whale tracker + large-tx feed.
 - **Phase 2 (safety & governance)**: contract radar + safety check → governance dashboard + validator transparency + chain overview.
 - **Phase 3 (public goods)**: public API documentation, weekly-report automation, SDK self-hosting.

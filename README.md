@@ -1,8 +1,8 @@
-# Paxi 专业工具箱 · Pro Suite
+# Paxi Lens · 派希透镜（Paxi 链上工具集）
 
 Paxi Network 生态一体化工具集：**链上解码 + 发币 + 燃烧 + 资产管理 + 质押 + 治理**，纯前端部署，零服务器成本。
 
-> 由三个独立项目整合而成：paxi-toolbox（工具箱）、paxi-decoder（链上解码器）、paxi-pump（一键发币）、burn（代币燃烧器）。
+> 由多个独立项目整合而成：paxi-lens（原 paxi-toolbox 主仓库，现 moxiaomo856/paxi-lens）、paxi-decoder（链上解码器）、paxi-pump（一键发币）、burn（代币燃烧器）。
 > 整合经两位领域专家（整合正确性 + 安全合规）平行审计，审计发现的问题已全部修复。
 
 ## 功能总览

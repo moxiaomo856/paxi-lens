@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Paxi 专业工具箱 · Pro Suite</title>
+  <title>Paxi Lens · 派希透镜</title>
   <meta name="description" content="Paxi Network 专业化工具集：链上解码 · 发币 · 燃烧 · 转账 · 质押 · 治理">
   <meta name="theme-color" content="#0f172a">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236366f1'/><text x='16' y='22' font-size='18' text-anchor='middle' fill='white'>P</text></svg>">
@@ -131,10 +131,6 @@
     }
     .btn-primary { background: var(--primary); color: white; }
     .btn-primary:active { background: var(--primary-hover); }
-    .btn-chain { background: linear-gradient(135deg, #0ea5e9, #2563eb); color: white; }
-    .btn-chain:active { background: linear-gradient(135deg, #0284c7, #1d4ed8); }
-    .btn-chain:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn-hint { font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 6px; line-height: 1.5; }
     .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
     .btn-outline:active { background: var(--bg-hover); }
     .btn-success { background: var(--success); color: white; }
@@ -551,7 +547,7 @@
   <div class="header-left">
     <div class="logo">P</div>
     <div>
-      <div class="header-title" id="appTitle">Paxi 专业工具箱</div>
+      <div class="header-title" id="appTitle">Paxi Lens</div>
     </div>
     <span class="header-badge">Pro 1.0</span>
   </div>
@@ -564,6 +560,23 @@
     <button class="btn btn-outline btn-sm" id="btnDisconnect" style="display:none" onclick="disconnectWallet()">断开</button>
   </div>
 </header>
+
+<!-- ===== ABOUT / 大小程序说明 ===== -->
+<section class="pl-about" style="max-width:500px;margin:14px auto 0;padding:14px 18px;border:1px solid var(--border,#e3e3e3);border-radius:10px;background:var(--bg-soft,#f4f6f9);font-size:13px;color:var(--text,#1a1a1a);line-height:1.7">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+    <strong style="font-size:14px">关于 Paxi Lens · 大小程序说明</strong>
+    <span style="cursor:pointer;color:var(--text-muted,#888);font-size:16px;line-height:1" title="关闭" onclick="this.closest('.pl-about').remove()">✕</span>
+  </div>
+  <div style="margin-top:8px">
+    Paxi Lens 是 Paxi 生态的 <b>非托管工具集</b>，分为两个程序：
+    <ul style="margin:6px 0 0;padding-left:18px">
+      <li><b>大程序（本页 · Paxi Lens 工具箱）</b>：20 个链上工具（发币、Swap、治理、委托、燃烧等），纯前端、私钥不出钱包。</li>
+      <li><b>小程序（链上解码器）</b>：已集成于本工具箱的轻量解码模块（在首页工具列表直接打开「链上解码器」即可），把原始交易 / 合约 / 钱包数据翻译成人话，纯只读、无需连钱包。</li>
+    </ul>
+    两者均 <b>非投资、非托管</b>，服务费 100% 进入单一透明地址，风险自担。<br>
+    <span style="color:var(--text-muted,#888);font-size:12px">Paxi Lens is a non-custodial Paxi toolkit with two programs: this 20-tool suite (large) and an integrated on-chain decoder (small). Not an investment. You control your keys.</span>
+  </div>
+</section>
 
 <!-- ===== MAIN ===== -->
 <main class="main" id="mainContent">

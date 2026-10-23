@@ -7,7 +7,7 @@
 // ============================================================
 const LANG = {
   zh: {
-    appTitle: 'Paxi 专业工具箱',
+    appTitle: 'Paxi Lens',
     back: '← 返回工具箱',
     tools: {
       decoder: '链上解码器',
@@ -165,7 +165,7 @@ const LANG = {
       daoDesc: '向社区池申请资助（CommunityPoolSpend）。提案通过后，社区池将向指定收款地址划拨拨款。',
       daoInfo: '💡 标题与摘要会公示给全体持币人投票。请写明用途、金额构成、里程碑与交付时间；收款地址建议使用项目运营金库地址。',
       daoLabelTitle: '提案标题',
-      daoTitlePlaceholder: '例如：Paxi 棋阁上线与三个月运维资助 (150,000 PAXI)',
+      daoTitlePlaceholder: '例如：Paxi Lens 上线与六个月运维资助 (300,000 PAXI)',
       daoLabelSummary: '提案摘要 (summary)',
       daoSummaryPlaceholder: '一句话概括申请内容与金额…',
       daoLabelDesc: '提案详情 (description)',
@@ -381,7 +381,7 @@ const LANG = {
     }
   },
   en: {
-    appTitle: 'Paxi Pro Suite',
+    appTitle: 'Paxi Lens',
     back: '← Back',
     tools: {
       decoder: 'On-chain Decoder',
@@ -539,7 +539,7 @@ const LANG = {
       daoDesc: 'Apply for funding from the community pool (CommunityPoolSpend). If the proposal passes, the pool transfers the amount to the recipient address.',
       daoInfo: '💡 Title and summary are public to all token holders voting. State the purpose, budget breakdown, milestones and delivery timeline; use your project treasury address as recipient.',
       daoLabelTitle: 'Proposal Title',
-      daoTitlePlaceholder: 'e.g. Paxi Chess Pavilion launch + 3-month maintenance funding (150,000 PAXI)',
+      daoTitlePlaceholder: 'e.g. Paxi Lens launch + 6-month maintenance funding (300,000 PAXI)',
       daoLabelSummary: 'Proposal Summary (summary)',
       daoSummaryPlaceholder: 'One sentence describing the request and amount…',
       daoLabelDesc: 'Proposal Description (description)',
