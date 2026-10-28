@@ -143,7 +143,7 @@ window.TOOL_REGISTRY ||= {};
   }
   // 统一收款地址：所有发币服务费均打入平台单一收款地址（与监控后台、其余工具保持一致）
   function getRandomReceiver() {
-    return (typeof CONFIG !== 'undefined' && CONFIG.feeCollector) || 'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd';
+    return (typeof CONFIG !== 'undefined' && CONFIG.feeCollector) || 'paxi1ga6x5ljj547ax436sfc5kw6fn3vfdwqtn0kpwg';
   }
 
   /* ------------------------------------------------ 钱包（复用 suite 状态，支持 Keplr 兜底） */

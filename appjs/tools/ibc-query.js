@@ -9,11 +9,11 @@ const IQ_DICT = {
     clientsBtn: '🛡 查询客户端',
     resolveBtn: '🔍 解析 denom',
     hashPh: '输入 ibc/... 哈希或裸哈希',
-    notEnabled: '⚠️ 该 IBC 接口返回错误，Paxi 主网当前可能未启用 IBC 通道（不影响其他功能）。',
+    notEnabled: '⚠️ Paxi 部分 IBC 接口未实现，跨链可用性请以实际转账为准。',
     loading: '查询中...',
     noData: '无数据',
     resolved: '✅ 解析结果',
-    info: '本工具为只读查询，不会对链上发起任何交易。若 Paxi 主网未启用 IBC 模块，相关接口会返回错误，属正常现象。'
+    info: '本工具为只读查询，不会对链上发起任何交易。Paxi 主网部分 IBC 接口尚未实现（如 denom 映射），相关查询返回错误属正常现象；跨链能否使用请以实际转账到账为准。'
   },
   en: {
     title: 'IBC Query',
@@ -23,11 +23,11 @@ const IQ_DICT = {
     clientsBtn: 'Query Clients',
     resolveBtn: 'Resolve Denom',
     hashPh: 'Enter ibc/... hash or bare hash',
-    notEnabled: 'This IBC endpoint returned an error; Paxi mainnet may not have IBC enabled (other features unaffected).',
+    notEnabled: '⚠️ Some Paxi IBC endpoints are not implemented; cross-chain availability should be verified by an actual transfer.',
     loading: 'Querying...',
     noData: 'No data',
     resolved: 'Resolved',
-    info: 'This tool is read-only and submits no transactions. If Paxi mainnet has IBC disabled, the endpoints return errors — this is expected.'
+    info: 'This tool is read-only and submits no transactions. Some Paxi IBC endpoints are not yet implemented (e.g. denom traces); endpoint errors are expected. Whether cross-chain transfers actually work should be verified by a real transfer.'
   }
 };
 

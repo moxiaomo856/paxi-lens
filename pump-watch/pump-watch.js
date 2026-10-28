@@ -16,7 +16,7 @@ const path = require('path');
 const LCD = 'https://mainnet-lcd.paxinet.io';
 // 收款地址：与 dApp 统一为单一平台收款地址 CONFIG.feeCollector
 const FEE_RECEIVERS = new Set([
-    "paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd"
+    "paxi1ga6x5ljj547ax436sfc5kw6fn3vfdwqtn0kpwg"
 ]);
 // 单次最多扫描的区块数（防止停机太久导致扫描时间过长，超过则跳过中间段）
 const MAX_BLOCKS_PER_RUN = 3000;

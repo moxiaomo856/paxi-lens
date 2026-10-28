@@ -121,7 +121,7 @@ async function simulate(label, submitMsg) {
 // 链上真实数据（提案 #13 黄金样本）
 const DENOM = 'upaxi';
 const GOV_AUTH = 'paxi10d07y265gmmuvt4z0w9aw880jnsr700je7h2vr';
-const RECIPIENT = 'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd';
+const RECIPIENT = 'paxi1ga6x5ljj547ax436sfc5kw6fn3vfdwqtn0kpwg';
 
 function buildSubmit(typeUrl, spendTypeUrl, amountMicro) {
   const spend = {

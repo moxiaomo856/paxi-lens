@@ -17,7 +17,7 @@ Private keys and funds **never leave your wallet**. Paxi Lens cannot move, freez
 
 ### D. Service Fees Are Transparent and Pre-Disclosed
 Certain tools charge a fixed service fee that is routed **100% to a single, publicly verifiable address**:
-`paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd`
+`paxi1ga6x5ljj547ax436sfc5kw6fn3vfdwqtn0kpwg`
 The exact fee amount and recipient are **always displayed for your confirmation before you sign** any transaction. These fees are payment for software use, not a purchase of any asset, token, or equity.
 
 ### E. No Buyback, Yield, Prize Pool, or Return Promise
@@ -79,7 +79,7 @@ Paxi Lens 是工具软件，**不是**钱包、交易所、托管方、经纪商
 
 ### D. 服务费透明且签名前明示
 部分工具收取固定服务费，该费用**100% 归集至单一、链上可核实的地址**：
-`paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd`
+`paxi1ga6x5ljj547ax436sfc5kw6fn3vfdwqtn0kpwg`
 在您签署任何交易前，**费用金额与收款地址都会明确展示供您确认**。该费用是对软件使用的付费，并非购买任何资产、代币或股权。
 
 ### E. 无回购、无收益、无奖池、无回报承诺

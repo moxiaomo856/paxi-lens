@@ -227,7 +227,7 @@ function renderDaoProposalCard() {
 
       <div class="form-group">
         <label class="form-label">${_t('proposal.daoLabelTitle','提案标题')}</label>
-        <input type="text" id="daoPropTitle" placeholder="${_t('proposal.daoTitlePlaceholder','例如：Paxi Lens 上线与六个月运维资助 (300,000 PAXI)')}">
+        <input type="text" id="daoPropTitle" placeholder="${_t('proposal.daoTitlePlaceholder','例如：将 Paxi Lens 纳入官方钱包 dApp 搜索 ＋ 资助开发团队 360,000 PAXI')}">
       </div>
 
       <div class="form-group">
