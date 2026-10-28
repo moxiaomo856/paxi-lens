@@ -104,7 +104,10 @@ function daoWhitelist() {
 // 当前连接的钱包是否在 DAO 白名单内
 function isDaoProposerAllowed() {
   if (typeof state === 'undefined' || !state.connected || !state.wallet || !state.wallet.address) return false;
-  return daoWhitelist().includes(state.wallet.address);
+  // bech32 有全大写形式，部分钱包会返回该形式；直接字符串比较会误判为"非白名单"。
+  const addr = (state.wallet.address || '').trim().toLowerCase();
+  if (!addr) return false;
+  return daoWhitelist().some(x => (x || '').trim().toLowerCase() === addr);
 }
 
 function renderProposal() {

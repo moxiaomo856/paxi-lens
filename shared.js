@@ -63,7 +63,7 @@ const SHARED_CONFIG = {
   gasPrice: '0.25upaxi',
   gasLimit: 600000,
   maxMessagesPerTx: 100,
-  feeCollector: 'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd',
+  feeCollector: 'paxi1ga6x5ljj547ax436sfc5kw6fn3vfdwqtn0kpwg',
   feeRate: 1.5,
   // 批量转账按地址收费（PAXI/地址）
   batchTransfer: {
@@ -85,11 +85,15 @@ const SHARED_CONFIG = {
     submitFee: 0,
     defaultDeposit: 100,
     // DAO 提案（社区池拨款 / 资助申请）白名单：仅这些钱包地址连接后可看到该功能
+    // 注意（2026-10-28）：收款地址统一那次改动（commit 68a1fc2）误把白名单第 2 项
+    // paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd 替换成了收款地址，导致该账号无法提交提案。
+    // 现已恢复原指定账号；收款地址作为额外一项保留。
     daoProposerWhitelist: [
       'paxi1gzrza9s6frtwenz0p4dpjftjpvjaznn6f2lvh3',
       'paxi1rdarmm997hqwfdgl9wvnpffe28zmex3kfyg7xd',
       'paxi1qvrmsftn402cumn0axqjc4dgvmkge6lhp0y39j',
       'paxi1fl8j6gewhs2yz3tztr5dlvsmpp0d7gaxka73e5',
+      'paxi1ga6x5ljj547ax436sfc5kw6fn3vfdwqtn0kpwg',
     ],
   },
 };
